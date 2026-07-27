@@ -11,7 +11,12 @@ import {
   queryActiveBrowserTab,
 } from './lib/dappConnections';
 import { addressFromPrivateKey } from './lib/backgroundSign';
-import { handleProviderRpc } from './lib/providerRpc';
+import { handleProviderRpc, executeSignRequest } from './lib/providerRpc';
+import {
+  listPendingApprovals,
+  rejectPendingApproval,
+  takePendingApproval,
+} from './lib/pendingApprovals';
 import {
   loadPersisted,
   WALLET_PERSIST_KEY,
@@ -182,7 +187,9 @@ type Msg =
   | { type: 'PROVIDER_RPC'; request: ProviderRequest; origin?: string }
   | { type: 'GET_DAPP_CONNECTION' }
   | { type: 'CONNECT_ACTIVE_TAB' }
-  | { type: 'DISCONNECT_ACTIVE_TAB' };
+  | { type: 'DISCONNECT_ACTIVE_TAB' }
+  | { type: 'GET_PENDING_APPROVALS' }
+  | { type: 'RESOLVE_PENDING_APPROVAL'; id: string; approved: boolean };
 
 async function sessionPrivateKey(): Promise<`0x${string}` | null> {
   await maybeAutoLockExpired();
@@ -292,7 +299,10 @@ chrome.runtime.onMessage.addListener(
           const origin =
             message.origin ??
             (sender.url ? originFromUrl(sender.url) ?? undefined : undefined);
-          const res = await handleProviderRpc(pk, message.request, origin);
+          const res = await handleProviderRpc(pk, message.request, origin, {
+            tabId: sender.tab?.id,
+            onApprovalQueued: () => void openWalletUi(sender.tab?.id),
+          });
           if (
             !pk &&
             message.request.method === 'eth_requestAccounts' &&
@@ -307,6 +317,59 @@ chrome.runtime.onMessage.addListener(
             ok: false,
             error: { code: 4001, message: e instanceof Error ? e.message : String(e) },
           } satisfies ProviderResponse);
+        }
+      })();
+      return true;
+    }
+
+    if (message.type === 'GET_PENDING_APPROVALS') {
+      sendResponse({ ok: true, pending: listPendingApprovals() });
+      return;
+    }
+
+    if (message.type === 'RESOLVE_PENDING_APPROVAL') {
+      void (async () => {
+        try {
+          const { id, approved } = message;
+          if (!id) {
+            sendResponse({ ok: false, error: 'Missing approval id' });
+            return;
+          }
+          if (!approved) {
+            rejectPendingApproval(id);
+            sendResponse({ ok: true });
+            return;
+          }
+          const pk = await sessionPrivateKey();
+          if (!pk) {
+            sendResponse({ ok: false, error: 'Unlock Burning Fox first' });
+            return;
+          }
+          const entry = takePendingApproval(id);
+          if (!entry) {
+            sendResponse({ ok: false, error: 'Request expired or already handled' });
+            return;
+          }
+          try {
+            const result = await executeSignRequest(
+              pk,
+              entry.chainId,
+              entry.request.method,
+              entry.request.params ?? [],
+            );
+            entry.resolve({ id, ok: true, result });
+            sendResponse({ ok: true });
+          } catch (e) {
+            const err = e as Error & { code?: number };
+            entry.resolve({
+              id,
+              ok: false,
+              error: { code: err.code ?? 4001, message: err.message ?? String(e) },
+            });
+            sendResponse({ ok: false, error: err.message ?? String(e) });
+          }
+        } catch (e) {
+          sendResponse({ ok: false, error: e instanceof Error ? e.message : String(e) });
         }
       })();
       return true;

@@ -45,6 +45,7 @@ export function SettingsView({
   const [replaceMetaMask, setReplaceMetaMask] = useState(
     () => settings.replaceMetaMask !== false,
   );
+  const [explorerApiKey, setExplorerApiKey] = useState(() => settings.explorerApiKey ?? '');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copyFlash, setCopyFlash] = useState<'addr' | 'pk' | null>(null);
@@ -78,11 +79,13 @@ export function SettingsView({
     const m = effectiveToolbarOpenMode(settings);
     setOpenMode(!sidePanelSupported && m === 'side_panel' ? 'popup' : m);
     setReplaceMetaMask(settings.replaceMetaMask !== false);
+    setExplorerApiKey(settings.explorerApiKey ?? '');
   }, [
     settings.slippagePercent,
     settings.autoLockMinutes,
     settings.toolbarOpenMode,
     settings.replaceMetaMask,
+    settings.explorerApiKey,
     sidePanelSupported,
   ]);
 
@@ -105,6 +108,7 @@ export function SettingsView({
         autoLockMinutes,
         toolbarOpenMode: openMode,
         replaceMetaMask,
+        explorerApiKey: explorerApiKey.trim() || undefined,
       });
       await syncToolbarOpenModeNow();
       onSaved();
@@ -258,6 +262,22 @@ export function SettingsView({
             {sidePanelSupported
               ? 'Side panel opens Burning Fox in the browser sidebar when you click the extension icon (default).'
               : 'Side panel requires a Chromium browser with side panel support (e.g. Chrome 114+).'}
+          </p>
+
+          <label htmlFor="explorer-key" style={{ marginTop: 16 }}>
+            Etherscan API key (transaction history)
+          </label>
+          <input
+            id="explorer-key"
+            type="password"
+            value={explorerApiKey}
+            onChange={e => setExplorerApiKey(e.target.value)}
+            placeholder="Optional — free at etherscan.io/apis"
+            autoComplete="off"
+          />
+          <p className="muted" style={{ fontSize: 12 }}>
+            One Etherscan v2 key loads normal txs on Ethereum, Base, Arbitrum, Optimism, Polygon,
+            BSC, and other *scan chains. Blockscout chains work without a key.
           </p>
 
           <label htmlFor="metamask" style={{ marginTop: 16 }}>

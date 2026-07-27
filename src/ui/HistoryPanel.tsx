@@ -1,75 +1,447 @@
-import { useEffect, useState } from 'react';
-import { loadEvmMainnetChains } from '../lib/lifiBootstrap';
-import type { ExtendedChain } from '@lifi/types';
-import { loadSwapHistory, type SwapHistoryEntry } from '../lib/swapHistory';
-import { transactionExplorerUrl } from '../lib/explorerUrls';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { getAddress } from 'viem';
+import { getUnlockedAccount } from '../lib/accountSession';
+import { effectiveActiveChainId, type AppSettings } from '../lib/storageState';
+import { chainById } from '../lib/chainCatalog';
+import { chainLogoUri } from '../lib/chainLogo';
+import {
+  fetchAddressTxHistoryPage,
+  formatTxValue,
+  needsExplorerApiKey,
+  txExplorerLink,
+  TX_HISTORY_PAGE_SIZE,
+  type TxHistoryRow,
+} from '../lib/explorerTxHistory';
+import {
+  clearTxHistoryCache,
+  loadTxHistoryCache,
+  mergeTxRows,
+  saveTxHistoryCache,
+} from '../lib/txHistoryCursor';
+import { describeError } from '../lib/utils';
+import { JumpaLiFiIcon } from './JumpaLiFiIcon';
 
-function formatSwapHistoryRelTime(at: number): string {
-  const d = Date.now() - at;
-  if (d < 45_000) return 'Just now';
-  if (d < 3_600_000) return `${Math.floor(d / 60_000)}m ago`;
-  if (d < 86_400_000) return `${Math.floor(d / 3_600_000)}h ago`;
-  return new Date(at).toLocaleString(undefined, {
+type TxKind = 'sent' | 'received' | 'self' | 'contract';
+
+type DateGroup = {
+  label: string;
+  rows: TxHistoryRow[];
+};
+
+function isSameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function formatDateGroupLabel(timestamp: number): string {
+  const d = new Date(timestamp);
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (isSameDay(d, now)) return 'Today';
+  if (isSameDay(d, yesterday)) return 'Yesterday';
+  return d.toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+    year: 'numeric',
   });
 }
 
-export function HistoryPanel() {
-  const [swapHistory, setSwapHistory] = useState<SwapHistoryEntry[]>([]);
-  const [chainMeta, setChainMeta] = useState<Map<number, ExtendedChain>>(new Map());
+function groupRowsByDate(rows: TxHistoryRow[]): DateGroup[] {
+  const groups: DateGroup[] = [];
+  for (const row of rows) {
+    const label = formatDateGroupLabel(row.timestamp);
+    const last = groups[groups.length - 1];
+    if (last?.label === label) last.rows.push(row);
+    else groups.push({ label, rows: [row] });
+  }
+  return groups;
+}
+
+function shortAddress(addr: string): string {
+  if (addr.length < 12) return addr;
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
+
+function txKind(row: TxHistoryRow): TxKind {
+  if (row.direction === 'self') return 'self';
+  if (row.value === 0n && row.to) return 'contract';
+  if (row.direction === 'in') return 'received';
+  return 'sent';
+}
+
+function txTitle(kind: TxKind, symbol: string): string {
+  switch (kind) {
+    case 'sent':
+      return `Sent ${symbol}`;
+    case 'received':
+      return `Received ${symbol}`;
+    case 'self':
+      return `Self ${symbol}`;
+    case 'contract':
+      return 'Contract interaction';
+  }
+}
+
+function txSubtitle(row: TxHistoryRow, kind: TxKind): string {
+  if (kind === 'self') return 'Self transfer';
+  if (kind === 'contract' && row.to) return `With ${shortAddress(row.to)}`;
+  if (kind === 'received') {
+    return row.from ? `From ${shortAddress(row.from)}` : 'Incoming transfer';
+  }
+  if (row.to) return `To ${shortAddress(row.to)}`;
+  return 'Outgoing transfer';
+}
+
+function formatAmount(row: TxHistoryRow, chainId: number): string | null {
+  if (row.value === 0n) return null;
+  const formatted = formatTxValue(row.value, chainId);
+  if (row.direction === 'in') return `+${formatted}`;
+  if (row.direction === 'out' || row.direction === 'self') return `-${formatted}`;
+  return formatted;
+}
+
+function explorerName(chainId: number): string {
+  const url = chainById(chainId)?.blockExplorerUrls[0];
+  if (!url) return 'Explorer';
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    if (host.includes('etherscan')) return 'Etherscan';
+    if (host.includes('basescan')) return 'Basescan';
+    if (host.includes('arbiscan')) return 'Arbiscan';
+    if (host.includes('polygonscan')) return 'Polygonscan';
+    if (host.includes('optimistic')) return 'Optimistic Etherscan';
+    if (host.includes('bscscan')) return 'BscScan';
+    const base = host.split('.')[0];
+    return base.charAt(0).toUpperCase() + base.slice(1);
+  } catch {
+    return 'Explorer';
+  }
+}
+
+function TxDirectionIcon({ kind }: { kind: TxKind }) {
+  const cls = `bfox-tx-history__dir-icon bfox-tx-history__dir-icon--${kind}`;
+  if (kind === 'received') {
+    return (
+      <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+        <path d="M12 5v14M5 12l7 7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (kind === 'sent') {
+    return (
+      <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+        <path d="M12 19V5M5 12l7-7 7 7" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (kind === 'self') {
+    return (
+      <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+        <path d="M7 10h10M7 14h10M12 7v10" strokeLinecap="round" />
+        <path d="M4 4h16v16H4z" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  return (
+    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M8 9h8M8 13h6M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ExternalLinkIcon() {
+  return (
+    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" strokeLinecap="round" />
+      <polyline points="15 3 21 3 21 9" strokeLinecap="round" />
+      <line x1="10" y1="14" x2="21" y2="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function TxHistoryRowItem({
+  row,
+  chainId,
+  chainName,
+  chainLogo,
+  explorerLabel,
+}: {
+  row: TxHistoryRow;
+  chainId: number;
+  chainName: string;
+  chainLogo: string;
+  explorerLabel: string;
+}) {
+  const kind = txKind(row);
+  const symbol = chainById(chainId)?.nativeCurrency.symbol ?? 'ETH';
+  const title = txTitle(kind, symbol);
+  const subtitle = txSubtitle(row, kind);
+  const amount = formatAmount(row, chainId);
+  const url = txExplorerLink(chainId, row.hash);
+
+  return (
+    <li className={`bfox-tx-history__item${row.success ? '' : ' bfox-tx-history__item--failed'}`}>
+      <div className="bfox-tx-history__icon-wrap">
+        <span className={`bfox-tx-history__icon bfox-tx-history__icon--${kind}`}>
+          <TxDirectionIcon kind={kind} />
+        </span>
+        <span className="bfox-tx-history__chain-badge" title={chainName}>
+          <JumpaLiFiIcon logoURI={chainLogo} label={chainName} size={14} rounded />
+        </span>
+      </div>
+
+      <div className="bfox-tx-history__main">
+        <span className="bfox-tx-history__title">{title}</span>
+        <span className="bfox-tx-history__subtitle">{subtitle}</span>
+        {!row.success ? <span className="bfox-tx-history__failed-tag">Failed</span> : null}
+      </div>
+
+      <div className="bfox-tx-history__right">
+        {amount ? (
+          <span
+            className={`bfox-tx-history__amount${
+              row.direction === 'in' ? ' bfox-tx-history__amount--in' : ''
+            }`}
+          >
+            {amount}
+          </span>
+        ) : (
+          <span className="bfox-tx-history__amount bfox-tx-history__amount--empty">—</span>
+        )}
+        <span className="bfox-tx-history__time">
+          {new Date(row.timestamp).toLocaleTimeString(undefined, {
+            hour: 'numeric',
+            minute: '2-digit',
+          })}
+        </span>
+      </div>
+
+      {url ? (
+        <a
+          className="bfox-tx-history__explorer"
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={`View on ${explorerLabel}`}
+          aria-label={`View transaction on ${explorerLabel}`}
+        >
+          <ExternalLinkIcon />
+        </a>
+      ) : null}
+    </li>
+  );
+}
+
+export function HistoryPanel({ settings }: { settings: AppSettings }) {
+  const account = getUnlockedAccount();
+  const addr = account ? getAddress(account.address) : null;
+  const chainId = effectiveActiveChainId(settings);
+  const chain = chainById(chainId);
+  const apiKey = settings.explorerApiKey?.trim();
+  const chainLogo = chain ? chainLogoUri(chain) : undefined;
+  const explorerLabel = explorerName(chainId);
+
+  const [rows, setRows] = useState<TxHistoryRow[]>([]);
+  const [pagesLoaded, setPagesLoaded] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  const grouped = useMemo(() => groupRowsByDate(rows), [rows]);
+
+  const persist = useCallback(
+    async (nextRows: TxHistoryRow[], pages: number, more: boolean) => {
+      if (!addr) return;
+      await saveTxHistoryCache(chainId, addr, {
+        rows: nextRows,
+        pagesLoaded: pages,
+        hasMore: more,
+      });
+    },
+    [addr, chainId],
+  );
+
+  const fetchPage = useCallback(
+    async (page: number, append: boolean) => {
+      if (!addr) return;
+      const { rows: batch, hasMore: more } = await fetchAddressTxHistoryPage({
+        chainId,
+        address: addr,
+        explorerApiKey: apiKey,
+        page,
+      });
+      let nextRows: TxHistoryRow[] = batch;
+      setRows(prev => {
+        nextRows = append ? mergeTxRows(prev, batch) : batch;
+        return nextRows;
+      });
+      setPagesLoaded(page);
+      setHasMore(more);
+      await persist(nextRows, page, more);
+    },
+    [addr, apiKey, chainId, persist],
+  );
+
+  const loadInitial = useCallback(async () => {
+    if (!addr) return;
+    if (needsExplorerApiKey(chainId) && !apiKey) {
+      setRows([]);
+      setPagesLoaded(0);
+      setHasMore(false);
+      setErr(null);
+      setHydrated(true);
+      return;
+    }
+
+    setBusy(true);
+    setErr(null);
+    try {
+      const cached = await loadTxHistoryCache(chainId, addr);
+      if (cached && cached.rows.length > 0) {
+        setRows(cached.rows);
+        setPagesLoaded(cached.pagesLoaded);
+        setHasMore(cached.hasMore);
+        setHydrated(true);
+        return;
+      }
+      await fetchPage(1, false);
+    } catch (e) {
+      setErr(describeError(e));
+      setRows([]);
+      setPagesLoaded(0);
+      setHasMore(false);
+    } finally {
+      setBusy(false);
+      setHydrated(true);
+    }
+  }, [addr, apiKey, chainId, fetchPage]);
 
   useEffect(() => {
-    void loadSwapHistory().then(setSwapHistory);
-    void loadEvmMainnetChains().then(chains => {
-      setChainMeta(new Map(chains.map(c => [c.id, c])));
-    });
-  }, []);
+    setHydrated(false);
+    void loadInitial();
+  }, [chainId, addr, apiKey]);
 
-  if (swapHistory.length === 0) {
+  async function loadMore() {
+    if (!addr || !hasMore || loadingMore) return;
+    setLoadingMore(true);
+    setErr(null);
+    try {
+      await fetchPage(pagesLoaded + 1, true);
+    } catch (e) {
+      setErr(describeError(e));
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  async function refreshLatest() {
+    if (!addr) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await clearTxHistoryCache(chainId, addr);
+      setRows([]);
+      setPagesLoaded(0);
+      setHasMore(false);
+      await fetchPage(1, false);
+    } catch (e) {
+      setErr(describeError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!addr) {
+    return <p className="bfox-tools-empty muted">Unlock wallet to view transaction history.</p>;
+  }
+
+  if (needsExplorerApiKey(chainId) && !apiKey) {
     return (
       <p className="bfox-tools-empty muted">
-        No swap history yet. Completed swaps from the Swap tab appear here.
+        Add a free <strong>Etherscan API key</strong> in Settings to load transaction history on{' '}
+        {chain?.name ?? chainId}. One key works across Etherscan-family chains (Ethereum, Base,
+        Arbitrum, …).
       </p>
     );
   }
 
   return (
-    <ul className="jumpa-history-tab__list jumpa-swap-history__list">
-      {swapHistory.map(e => {
-        const url = transactionExplorerUrl(e.txChainId, e.txHash, chainMeta.get(e.txChainId));
-        const sub =
-          (e.crossChain ? 'Bridge' : 'Swap') +
-          ' · ' +
-          formatSwapHistoryRelTime(e.at) +
-          (url ? ' · View tx' : '');
-        const inner = (
-          <>
-            <span className="jumpa-swap-history__pair">
-              {e.fromSymbol} → {e.toSymbol}
-            </span>
-            <span className="jumpa-swap-history__sub muted">{sub}</span>
-          </>
-        );
-        return (
-          <li key={e.id}>
-            {url ? (
-              <a
-                className="jumpa-swap-history__row"
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {inner}
-              </a>
-            ) : (
-              <span className="jumpa-swap-history__row jumpa-swap-history__row--dead">{inner}</span>
-            )}
-          </li>
-        );
-      })}
-    </ul>
+    <div className="bfox-tx-history">
+      <div className="bfox-tx-history__head">
+        <div className="bfox-tx-history__head-main">
+          {chainLogo ? (
+            <JumpaLiFiIcon logoURI={chainLogo} label={chain?.name} size={28} rounded />
+          ) : null}
+          <div>
+            <p className="bfox-tx-history__head-title">{chain?.name ?? `Chain ${chainId}`}</p>
+            <p className="bfox-tx-history__head-sub muted">
+              {rows.length > 0
+                ? `${rows.length} transaction${rows.length === 1 ? '' : 's'}`
+                : 'Activity'}
+              {pagesLoaded > 1 ? ` · ${pagesLoaded} pages` : ''}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="bfox-tx-history__refresh"
+          disabled={busy}
+          onClick={() => void refreshLatest()}
+        >
+          {busy ? '…' : 'Refresh'}
+        </button>
+      </div>
+
+      {err ? <p className="error">{err}</p> : null}
+
+      {!hydrated || (busy && rows.length === 0) ? (
+        <p className="bfox-tools-empty muted">Loading transactions…</p>
+      ) : null}
+
+      {hydrated && !busy && rows.length === 0 && !err ? (
+        <p className="bfox-tools-empty muted">No transactions found for this address on this network.</p>
+      ) : null}
+
+      {rows.length > 0 ? (
+        <div className="bfox-tx-history__groups">
+          {grouped.map(group => (
+            <section key={group.label} className="bfox-tx-history__group">
+              <h3 className="bfox-tx-history__date">{group.label}</h3>
+              <ul className="bfox-tx-history__list">
+                {group.rows.map(row => (
+                  <TxHistoryRowItem
+                    key={row.hash}
+                    row={row}
+                    chainId={chainId}
+                    chainName={chain?.name ?? String(chainId)}
+                    chainLogo={chainLogo ?? ''}
+                    explorerLabel={explorerLabel}
+                  />
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      ) : null}
+
+      {hasMore ? (
+        <button
+          type="button"
+          className="bfox-tx-history__load-more"
+          disabled={loadingMore || busy}
+          onClick={() => void loadMore()}
+        >
+          {loadingMore ? 'Loading…' : `Load ${TX_HISTORY_PAGE_SIZE} more`}
+        </button>
+      ) : rows.length > 0 ? (
+        <p className="bfox-tx-history__end muted">End of loaded history</p>
+      ) : null}
+    </div>
   );
 }

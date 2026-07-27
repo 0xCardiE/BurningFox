@@ -2,14 +2,12 @@ import { useState } from 'react';
 import type { AppSettings } from '../lib/storageState';
 import { MultiSendView } from './MultiSendView';
 import { HistoryPanel } from './HistoryPanel';
-import { ApprovalsPanel } from './ApprovalsPanel';
 
-export type ToolsSubTab = 'multisend' | 'history' | 'approvals';
+export type ToolsSubTab = 'multisend' | 'history';
 
 const TOOL_TABS: { id: ToolsSubTab; label: string }[] = [
   { id: 'multisend', label: 'Multisend' },
   { id: 'history', label: 'History' },
-  { id: 'approvals', label: 'Approvals' },
 ];
 
 export function ToolsView({ settings }: { settings: AppSettings }) {
@@ -33,8 +31,7 @@ export function ToolsView({ settings }: { settings: AppSettings }) {
 
       <div className="bfox-tools-panel">
         {tab === 'multisend' ? <MultiSendView settings={settings} /> : null}
-        {tab === 'history' ? <HistoryPanel /> : null}
-        {tab === 'approvals' ? <ApprovalsPanel settings={settings} /> : null}
+        {tab === 'history' ? <HistoryPanel settings={settings} /> : null}
       </div>
     </div>
   );

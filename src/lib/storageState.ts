@@ -6,6 +6,8 @@ import {
 import { setPreferredRpcMap, setCustomRpcMap } from './chainRpcRegistry';
 
 export type ToolbarOpenMode = 'popup' | 'side_panel';
+/** Speed = auto-confirm dapp requests when unlocked; normal = prompt each time. */
+export type TxConfirmMode = 'speed' | 'normal';
 
 export interface AppSettings {
   /** Relay / LiFi swap slippage tolerance in percent (e.g. 5 = 5%). */
@@ -22,6 +24,10 @@ export interface AppSettings {
   customRpcByChain?: Record<string, string[]>;
   /** When true, inject as window.ethereum (MetaMask drop-in). When false, use window.burningFox. */
   replaceMetaMask?: boolean;
+  /** Optional Etherscan API v2 key — one key covers most *scan explorers for tx history. */
+  explorerApiKey?: string;
+  /** Dapp signing mode — defaults to speed (auto-confirm). */
+  txConfirmMode?: TxConfirmMode;
 }
 
 export interface PersistedState {
@@ -115,6 +121,11 @@ export async function loadPersisted(): Promise<PersistedState> {
           preferredRpcByChain: normalizePreferredRpcMap(row.settings?.preferredRpcByChain),
           customRpcByChain: normalizeCustomRpcMap(row.settings?.customRpcByChain),
           replaceMetaMask: row.settings?.replaceMetaMask !== false,
+          explorerApiKey:
+            typeof row.settings?.explorerApiKey === 'string' && row.settings.explorerApiKey.trim()
+              ? row.settings.explorerApiKey.trim()
+              : undefined,
+          txConfirmMode: normalizeTxConfirmMode(row.settings?.txConfirmMode),
           ...(tm ? { toolbarOpenMode: tm } : {}),
         },
       };
@@ -175,6 +186,12 @@ function normalizeToolbarOpenMode(
   return undefined;
 }
 
+function normalizeTxConfirmMode(
+  v: string | undefined | null,
+): TxConfirmMode {
+  return v === 'normal' ? 'normal' : 'speed';
+}
+
 export function effectiveSlippagePercent(settings: AppSettings): number {
   const n = normalizeSlippagePercent(settings.slippagePercent);
   return n ?? DEFAULT_SLIPPAGE_PERCENT;
@@ -205,4 +222,8 @@ export function effectiveActiveChainId(settings: AppSettings): number {
 
 export function effectiveReplaceMetaMask(settings: AppSettings): boolean {
   return settings.replaceMetaMask !== false;
+}
+
+export function effectiveTxConfirmMode(settings: AppSettings): TxConfirmMode {
+  return normalizeTxConfirmMode(settings.txConfirmMode);
 }

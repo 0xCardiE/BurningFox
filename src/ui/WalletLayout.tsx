@@ -3,6 +3,8 @@ import type { AppSettings } from '../lib/storageState';
 import { ScreenHeader } from './ScreenHeader';
 import { NetworkSelector } from './NetworkSelector';
 import { DappConnectionBar } from './DappConnectionBar';
+import { TxConfirmModeBar } from './TxConfirmModeBar';
+import { TxApprovalSheet } from './TxApprovalSheet';
 
 export type WalletMainTab = 'assets' | 'swap' | 'tools';
 
@@ -65,7 +67,9 @@ export function WalletLayout({
 
       <div className="screen-body bfox-body bfox-body--main">{children}</div>
 
+      <TxConfirmModeBar settings={settings} onSaved={onSaved} />
       <DappConnectionBar settings={settings} />
+      <TxApprovalSheet />
     </div>
   );
 }

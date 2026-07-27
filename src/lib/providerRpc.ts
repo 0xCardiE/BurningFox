@@ -10,18 +10,58 @@ import {
 } from './backgroundSign';
 import {
   effectiveActiveChainId,
+  effectiveTxConfirmMode,
   loadPersisted,
   patchSettings,
   type AppSettings,
 } from './storageState';
 import { connectOrigin, isOriginConnected } from './dappConnections';
+import { isSignMethod, queueApprovalRequest } from './pendingApprovals';
 import { parseChainIdParam, providerError, toHexChainId } from '../provider/types';
 import type { ProviderRequest, ProviderResponse } from '../provider/types';
+
+export async function executeSignRequest(
+  pk: `0x${string}`,
+  chainId: number,
+  method: string,
+  params: unknown[],
+): Promise<unknown> {
+  if (method === 'eth_sendTransaction') {
+    const tx = params[0] as Record<string, unknown>;
+    if (!tx || typeof tx !== 'object') throw new Error('Invalid transaction');
+    return signAndSendTransaction(pk, chainId, tx as never);
+  }
+
+  if (method === 'personal_sign' || method === 'eth_sign') {
+    const [msgParam, addrParam] = params as [unknown, unknown];
+    const addr = addressFromPrivateKey(pk);
+    if (typeof addrParam === 'string' && getAddress(addrParam) !== addr) {
+      throw new Error('Signer address mismatch');
+    }
+    return signPersonalMessage(pk, bytesToHexMessage(msgParam as string));
+  }
+
+  if (
+    method === 'eth_signTypedData' ||
+    method === 'eth_signTypedData_v3' ||
+    method === 'eth_signTypedData_v4'
+  ) {
+    let typedRaw = params[1] ?? params[0];
+    if (method === 'eth_signTypedData_v3' || method === 'eth_signTypedData_v4') {
+      typedRaw = params[1];
+    }
+    const typed = parseTypedDataParam(typedRaw);
+    return signEip712(pk, typed);
+  }
+
+  throw Object.assign(new Error(`Unsupported method: ${method}`), { code: 4200 });
+}
 
 export async function handleProviderRpc(
   pk: `0x${string}` | null,
   request: ProviderRequest,
   origin?: string,
+  opts?: { tabId?: number; onApprovalQueued?: () => void },
 ): Promise<ProviderResponse> {
   const { id, method, params = [] } = request;
   try {
@@ -102,35 +142,18 @@ export async function handleProviderRpc(
       return { id, ok: true, result: null };
     }
 
-    if (method === 'eth_sendTransaction') {
-      const tx = params[0] as Record<string, unknown>;
-      if (!tx || typeof tx !== 'object') throw new Error('Invalid transaction');
-      const hash = await signAndSendTransaction(pk, chainId, tx as never);
-      return { id, ok: true, result: hash };
-    }
-
-    if (method === 'personal_sign' || method === 'eth_sign') {
-      const [msgParam, addrParam] = params as [unknown, unknown];
-      const addr = addressFromPrivateKey(pk);
-      if (typeof addrParam === 'string' && getAddress(addrParam) !== addr) {
-        throw new Error('Signer address mismatch');
+    if (isSignMethod(method)) {
+      if (effectiveTxConfirmMode(settings) === 'normal') {
+        return queueApprovalRequest({
+          request,
+          origin,
+          tabId: opts?.tabId,
+          chainId,
+          onQueued: opts?.onApprovalQueued,
+        });
       }
-      const sig = await signPersonalMessage(pk, bytesToHexMessage(msgParam as string));
-      return { id, ok: true, result: sig };
-    }
-
-    if (
-      method === 'eth_signTypedData' ||
-      method === 'eth_signTypedData_v3' ||
-      method === 'eth_signTypedData_v4'
-    ) {
-      let typedRaw = params[1] ?? params[0];
-      if (method === 'eth_signTypedData_v3' || method === 'eth_signTypedData_v4') {
-        typedRaw = params[1];
-      }
-      const typed = parseTypedDataParam(typedRaw);
-      const sig = await signEip712(pk, typed);
-      return { id, ok: true, result: sig };
+      const result = await executeSignRequest(pk, chainId, method, params);
+      return { id, ok: true, result };
     }
 
     throw Object.assign(new Error(`Unsupported method: ${method}`), { code: 4200 });
