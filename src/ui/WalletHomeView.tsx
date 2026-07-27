@@ -26,7 +26,6 @@ export function WalletHomeView({
   const [rows, setRows] = useState<WalletBalEntry[]>([]);
   const [busy, setBusy] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [copyFlash, setCopyFlash] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!addr) return;
@@ -48,17 +47,6 @@ export function WalletHomeView({
     void refresh();
   }, [refresh, chainId]);
 
-  async function copyAddress() {
-    if (!addr) return;
-    try {
-      await navigator.clipboard.writeText(addr);
-      setCopyFlash(true);
-      window.setTimeout(() => setCopyFlash(false), 1500);
-    } catch {
-      /* ignore */
-    }
-  }
-
   return (
     <div className="bfox-home">
       <div className="bfox-home-toolbar">
@@ -66,12 +54,6 @@ export function WalletHomeView({
           {busy ? '…' : 'Refresh'}
         </button>
       </div>
-
-      {addr ? (
-        <button type="button" className="bfox-address-chip mono" onClick={() => void copyAddress()}>
-          {copyFlash ? 'Copied!' : addr}
-        </button>
-      ) : null}
 
       <div className="bfox-token-list-head">
         <span>Tokens on {chain?.name ?? chainId}</span>

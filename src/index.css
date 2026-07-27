@@ -544,6 +544,46 @@ hr.sep {
   color: var(--purple);
 }
 
+/* Main wallet header: address + settings (no duplicate brand — Chrome chrome already shows it) */
+.bfox-main-header {
+  gap: 12px;
+}
+
+.bfox-main-header__addr {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  box-shadow: none;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bfox-main-header__addr:hover {
+  border-color: var(--border-strong);
+  background: var(--accent-soft-2);
+}
+
+.bfox-main-header__addr--empty {
+  cursor: default;
+  border-style: dashed;
+  font-weight: 500;
+}
+
+.bfox-main-header .screen-header-right {
+  width: auto;
+}
+
 .screen-body {
   padding: 16px;
   flex: 1;

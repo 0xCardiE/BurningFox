@@ -63,9 +63,36 @@ async function syncToolbarOpenModeFromSettings(): Promise<void> {
   }
 }
 
+/**
+ * After reload/update, open tabs still hold dead content scripts. Reinject so
+ * window.ethereum keep working without a manual page refresh.
+ */
+async function reinjectContentScripts(): Promise<void> {
+  try {
+    const tabs = await chrome.tabs.query({});
+    await Promise.all(
+      tabs.map(async tab => {
+        if (tab.id == null || tab.url == null) return;
+        if (!/^https?:/.test(tab.url) && !tab.url.startsWith('file:')) return;
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id, allFrames: true },
+            files: ['content.js'],
+          });
+        } catch {
+          /* chrome://, store, etc. — ignore */
+        }
+      }),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   void syncToolbarOpenModeFromSettings();
   void loadPersistedSettingsOnStart();
+  void reinjectContentScripts();
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {

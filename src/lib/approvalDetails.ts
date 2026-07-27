@@ -353,8 +353,8 @@ function transactionSections(
   return [
     { id: 'tx-overview', title: 'Overview', defaultOpen: true, fields: overview },
     { id: 'tx-gas', title: 'Gas & nonce', defaultOpen: true, fields: gasFields },
-    { id: 'tx-calldata', title: 'Calldata', defaultOpen: !!data && data.length > 10, fields: calldataFields },
-    { id: 'tx-raw', title: 'Raw request', fields: rawFields },
+    { id: 'tx-calldata', title: 'Calldata', defaultOpen: false, fields: calldataFields },
+    { id: 'tx-raw', title: 'Raw request', defaultOpen: false, fields: rawFields },
   ];
 }
 
