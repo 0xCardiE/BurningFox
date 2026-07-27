@@ -3379,7 +3379,7 @@ button.bfox-dd__option--on:hover {
 /* Quick Send inline row */
 .bfox-quick-send-inline {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr) max-content max-content;
+  grid-template-columns: max-content max-content max-content max-content;
   column-gap: 6px;
   row-gap: 6px;
   align-items: center;
@@ -3413,10 +3413,19 @@ button.bfox-dd__option--on:hover {
 
 .bfox-quick-send-inline__amt {
   grid-column: 2;
-  width: 100%;
+  /* Cap width so long max amounts don't push Send off-screen */
+  width: calc(10ch + 16px);
+  max-width: calc(10ch + 16px);
   min-width: 0;
   text-align: right;
   font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bfox-quick-send-inline__amt:focus {
+  overflow-x: auto;
+  text-overflow: clip;
 }
 
 .bfox-quick-send-inline__max {
