@@ -457,6 +457,40 @@ export async function snapshotHeldTokensOnChain(
   return out;
 }
 
+/** Revoke ERC-20 approval by setting allowance to zero. Returns tx hash if broadcast. */
+export async function revokeErc20Approval(params: {
+  chainId: number;
+  tokenAddress: string;
+  spender: string;
+}): Promise<string | null> {
+  const account = getUnlockedAccount();
+  if (!account) throw new Error('Wallet is locked.');
+  const t = params.tokenAddress.toLowerCase();
+  if (t === ZERO) return null;
+
+  const cur = await erc20Allowance(
+    params.chainId,
+    params.tokenAddress,
+    account.address,
+    params.spender,
+  );
+  if (cur === 0n) return null;
+
+  const data = encodeFunctionData({
+    abi: ERC20_ABI,
+    functionName: 'approve',
+    args: [params.spender as `0x${string}`, 0n],
+  });
+
+  return sendTransactionRequest(params.chainId, {
+    to: params.tokenAddress,
+    data,
+    value: '0x0',
+    from: account.address,
+    chainId: params.chainId,
+  });
+}
+
 /** Approve spender unless token is native or allowance already suffices. Returns tx hash if a tx was broadcast. */
 export async function ensureErc20Allowance(params: {
   chainId: number;

@@ -15,15 +15,69 @@ export type WalletBalEntry = {
   logoURI?: string;
 };
 
+const NATIVE_ADDRS = new Set([
+  '0x0000000000000000000000000000000000000000',
+  '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+]);
+
+export function isNativeWalletToken(entry: WalletBalEntry): boolean {
+  return NATIVE_ADDRS.has(entry.address.toLowerCase());
+}
+
+/** Human-readable token amount; uses scientific notation for huge/tiny values. */
+export function formatTokenAmount(amount: bigint, decimals: number): string {
+  if (amount === 0n) return '0';
+  try {
+    const raw = formatUnits(amount, decimals);
+    const n = Number(raw);
+    if (Number.isFinite(n) && n !== 0) {
+      const abs = Math.abs(n);
+      if (abs >= 1e12 || (abs > 0 && abs < 1e-7)) {
+        return n.toLocaleString(undefined, {
+          notation: 'scientific',
+          maximumSignificantDigits: 6,
+        });
+      }
+      if (abs >= 1) {
+        return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+      }
+      return n.toLocaleString(undefined, { maximumSignificantDigits: 6 });
+    }
+    return formatUnitsStringCompact(raw);
+  } catch {
+    return amount.toString();
+  }
+}
+
+function formatUnitsStringCompact(raw: string): string {
+  const negative = raw.startsWith('-');
+  const body = negative ? raw.slice(1) : raw;
+  const [intPart, frac = ''] = body.split('.');
+  const intDigits = intPart.replace(/^0+/, '') || '0';
+  if (intDigits.length > 8) {
+    const mantissa = `${intDigits[0]}.${intDigits.slice(1, 5)}`.replace(/\.$/, '');
+    const exp = intDigits.length - 1;
+    return `${negative ? '-' : ''}${mantissa}e+${exp}`;
+  }
+  const fracTrim = frac.replace(/0+$/, '');
+  const plain = fracTrim ? `${intPart}.${fracTrim}` : intPart;
+  if (plain.length <= 14) return `${negative ? '-' : ''}${plain}`;
+  const approx = Number(plain);
+  if (Number.isFinite(approx) && approx !== 0) {
+    return approx.toLocaleString(undefined, {
+      notation: 'scientific',
+      maximumSignificantDigits: 6,
+    });
+  }
+  return `${negative ? '-' : ''}${plain.slice(0, 12)}…`;
+}
+
 const RPC_BALANCE_OVERRIDE_TTL_MS = 120_000;
 const rpcFresh = new Map<number, { at: number; rows: WalletBalEntry[] }>();
 
 export function fmtTokenAmount(entry: WalletBalEntry): string {
   try {
-    const n = Number(formatUnits(BigInt(entry.amount || '0'), entry.decimals));
-    if (!Number.isFinite(n)) return '—';
-    if (n >= 1 || n === 0) return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
-    return n.toLocaleString(undefined, { maximumSignificantDigits: 6 });
+    return formatTokenAmount(BigInt(entry.amount || '0'), entry.decimals);
   } catch {
     return '—';
   }

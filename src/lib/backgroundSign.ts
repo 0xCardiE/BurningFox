@@ -192,6 +192,41 @@ export async function multiSendNative(params: {
   return hashes;
 }
 
+export async function sendNativeTransfer(params: {
+  pk: `0x${string}`;
+  chainId: number;
+  to: `0x${string}`;
+  amount: bigint;
+}): Promise<Hex> {
+  const from = addressFromPrivateKey(params.pk);
+  return signAndSendTransaction(params.pk, params.chainId, {
+    from,
+    to: params.to,
+    value: `0x${params.amount.toString(16)}`,
+  });
+}
+
+export async function sendErc20Transfer(params: {
+  pk: `0x${string}`;
+  chainId: number;
+  token: `0x${string}`;
+  to: `0x${string}`;
+  amount: bigint;
+}): Promise<Hex> {
+  const from = addressFromPrivateKey(params.pk);
+  const data = encodeFunctionData({
+    abi: ERC20_ABI,
+    functionName: 'transfer',
+    args: [params.to, params.amount],
+  });
+  return signAndSendTransaction(params.pk, params.chainId, {
+    from,
+    to: params.token,
+    data,
+    value: '0x0',
+  });
+}
+
 export async function multiSendErc20(params: {
   pk: `0x${string}`;
   chainId: number;

@@ -11,6 +11,11 @@ import {
   type WalletBalEntry,
 } from '../lib/walletBalances';
 import { JumpaLiFiIcon } from './JumpaLiFiIcon';
+import { QuickSendInline } from './QuickSendInline';
+
+function tokenRowKey(t: WalletBalEntry): string {
+  return `${t.chainId}:${t.address.toLowerCase()}`;
+}
 
 export function WalletHomeView({
   settings,
@@ -26,6 +31,7 @@ export function WalletHomeView({
   const [rows, setRows] = useState<WalletBalEntry[]>([]);
   const [busy, setBusy] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!addr) return;
@@ -44,8 +50,14 @@ export function WalletHomeView({
 
   useEffect(() => {
     invalidateRpcBalanceCache(chainId);
+    setExpandedKey(null);
     void refresh();
   }, [refresh, chainId]);
+
+  function toggleSend(t: WalletBalEntry) {
+    const key = tokenRowKey(t);
+    setExpandedKey(prev => (prev === key ? null : key));
+  }
 
   return (
     <div className="bfox-home">
@@ -57,6 +69,7 @@ export function WalletHomeView({
 
       <div className="bfox-token-list-head">
         <span>Tokens on {chain?.name ?? chainId}</span>
+        <span className="muted bfox-token-list-hint">Tap a token to send inline</span>
       </div>
 
       {err ? <p className="error bfox-home-error">{err}</p> : null}
@@ -72,19 +85,37 @@ export function WalletHomeView({
       <ul className="bfox-token-list">
         {rows.map(t => {
           const usd = fmtUsdValue(t);
+          const key = tokenRowKey(t);
+          const open = expandedKey === key;
           return (
-            <li key={`${t.chainId}:${t.address}`} className="bfox-token-row">
-              <JumpaLiFiIcon logoURI={t.logoURI} label={t.symbol} size={40} rounded />
-              <div className="bfox-token-row__meta">
-                <span className="bfox-token-row__name">{t.name || t.symbol}</span>
-                <span className="bfox-token-row__sym">{t.symbol}</span>
-              </div>
-              <div className="bfox-token-row__vals">
-                <span className="bfox-token-row__usd">{usd ?? '—'}</span>
-                <span className="bfox-token-row__amt">
-                  {fmtTokenAmount(t)} {t.symbol}
-                </span>
-              </div>
+            <li key={key} className={`bfox-token-item${open ? ' bfox-token-item--open' : ''}`}>
+              <button
+                type="button"
+                className="bfox-token-row bfox-token-row--action"
+                aria-expanded={open}
+                onClick={() => toggleSend(t)}
+              >
+                <JumpaLiFiIcon logoURI={t.logoURI} label={t.symbol} size={40} rounded />
+                <div className="bfox-token-row__meta">
+                  <span className="bfox-token-row__name">{t.name || t.symbol}</span>
+                  <span className="bfox-token-row__sym">{t.symbol}</span>
+                </div>
+                <div className="bfox-token-row__vals">
+                  <span className="bfox-token-row__usd">{usd ?? '—'}</span>
+                  <span className="bfox-token-row__amt">
+                    {fmtTokenAmount(t)} {t.symbol}
+                  </span>
+                </div>
+              </button>
+              {open ? (
+                <QuickSendInline
+                  key={key}
+                  token={t}
+                  chainId={chainId}
+                  onCollapse={() => setExpandedKey(null)}
+                  onSent={() => void refresh()}
+                />
+              ) : null}
             </li>
           );
         })}
