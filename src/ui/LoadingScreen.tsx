@@ -1,4 +1,4 @@
-import { BurningFoxMark } from './BurningFoxLogo';
+import { BurnBoxMark } from './BurnBoxLogo';
 
 export function LoadingScreen({ message }: { message?: string }) {
   return (
@@ -8,8 +8,8 @@ export function LoadingScreen({ message }: { message?: string }) {
       aria-live="polite"
       aria-busy="true"
     >
-      <BurningFoxMark className="loading-screen-logo" size={72} />
-      <p className="loading-screen-brand">Burning Fox</p>
+      <BurnBoxMark className="loading-screen-logo" size={72} />
+      <p className="loading-screen-brand">BurnBox</p>
       {message ? (
         <p className="loading-screen-message">{message}</p>
       ) : (

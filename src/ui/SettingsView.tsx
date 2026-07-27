@@ -279,7 +279,7 @@ export function SettingsView({
           </select>
           <p className="muted" style={{ fontSize: 12 }}>
             {sidePanelSupported
-              ? 'Side panel opens Burning Fox in the browser sidebar when you click the extension icon (default).'
+              ? 'Side panel opens BurnBox in the browser sidebar when you click the extension icon (default).'
               : 'Side panel requires a Chromium browser with side panel support (e.g. Chrome 114+).'}
           </p>
 
@@ -308,10 +308,10 @@ export function SettingsView({
             onChange={e => setReplaceMetaMask(e.target.value === 'replace')}
           >
             <option value="replace">Replace MetaMask (window.ethereum)</option>
-            <option value="separate">Separate provider (window.burningFox only)</option>
+            <option value="separate">Separate provider (window.burnBox only)</option>
           </select>
           <p className="muted" style={{ fontSize: 12 }}>
-            When enabled, sites that offer MetaMask will connect to Burning Fox instead. Reload open
+            When enabled, sites that offer MetaMask will connect to BurnBox instead. Reload open
             tabs after changing this.
           </p>
 
@@ -336,7 +336,7 @@ export function SettingsView({
                 browser restart.
               </li>
               <li>
-                Swaps and balances use LI.FI and public RPCs — nothing is sent to a Burning Fox
+                Swaps and balances use LI.FI and public RPCs — nothing is sent to a BurnBox
                 server.
               </li>
             </ul>

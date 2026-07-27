@@ -3,7 +3,7 @@ import { decryptPrivateKey } from '../lib/vault';
 import { loadPersisted } from '../lib/storageState';
 import { unlockWithPersistedSession } from '../lib/sessionBridge';
 import type { EncryptedVault } from '../lib/vault';
-import { BurningFoxMark } from './BurningFoxLogo';
+import { BurnBoxMark } from './BurnBoxLogo';
 
 export function Unlock({ onUnlocked }: { onUnlocked: () => void }) {
   const [vault, setVault] = useState<EncryptedVault | null | undefined>(undefined);
@@ -46,8 +46,8 @@ export function Unlock({ onUnlocked }: { onUnlocked: () => void }) {
   return (
     <div className="unlock-screen">
       <div className="unlock-brand">
-        <BurningFoxMark className="unlock-logo" size={88} />
-        <h1 className="unlock-title">Burning Fox</h1>
+        <BurnBoxMark className="unlock-logo" size={88} />
+        <h1 className="unlock-title">BurnBox</h1>
         <p className="unlock-lead">
           Developer burner wallet — unlock to sign swaps, multi-sends, and dapp transactions
           locally. Not for securing real funds.

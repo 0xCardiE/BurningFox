@@ -29,7 +29,7 @@ export interface AppSettings {
   customRpcByChain?: Record<string, string[]>;
   /** User-added chains (not in the curated catalog). */
   customChains?: ChainDefinition[];
-  /** When true, inject as window.ethereum (MetaMask drop-in). When false, use window.burningFox. */
+  /** When true, inject as window.ethereum (MetaMask drop-in). When false, use window.burnBox. */
   replaceMetaMask?: boolean;
   /** Optional Etherscan API v2 key — one key covers most *scan explorers for tx history. */
   explorerApiKey?: string;
@@ -43,8 +43,8 @@ export interface PersistedState {
 }
 
 /** Local storage key for the persisted vault + settings bundle. */
-export const WALLET_PERSIST_KEY = 'burning_fox_wallet_v1' as const;
-const LEGACY_KEYS = ['jumpa_wallet_v1', 'beewallet_v1'] as const;
+export const WALLET_PERSIST_KEY = 'burn_box_wallet_v1' as const;
+const LEGACY_KEYS = ['burning_fox_wallet_v1', 'jumpa_wallet_v1', 'beewallet_v1'] as const;
 const KEY = WALLET_PERSIST_KEY;
 
 const EMPTY: PersistedState = {

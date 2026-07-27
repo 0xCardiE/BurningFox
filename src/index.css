@@ -1,6 +1,6 @@
 :root {
   --popup-min-height: 520px;
-  /* Burning Fox — fire / fox palette */
+  /* BurnBox — fire / ember palette */
   --bg: #fff8f3;
   --bg-card: #ffffff;
   --bg-elevated: #ffffff;
@@ -360,75 +360,75 @@ hr.sep {
   filter: drop-shadow(0 1px 2px rgba(191, 54, 12, 0.18));
 }
 
-/* ── Burning Fox mark (inline SVG) ──────────────────────────────── */
-.bfox-mark {
+/* ── BurnBox mark (inline SVG) ──────────────────────────────────── */
+.bbox-mark {
   display: block;
   flex-shrink: 0;
   overflow: visible;
   transform-origin: 50% 55%;
 }
 
-.bfox-mark__glow {
+.bbox-mark__glow {
   transition: opacity 0.35s ease, transform 0.45s ease;
-  transform-origin: 64px 66px;
+  transform-origin: 64px 70px;
 }
 
-.bfox-mark__flame {
+.bbox-mark__flame {
   transform-box: fill-box;
   transform-origin: bottom center;
 }
 
-.bfox-mark--live .bfox-mark__flame--c {
-  animation: bfox-flame-c 2.6s ease-in-out infinite;
+.bbox-mark--live .bbox-mark__flame--c {
+  animation: bbox-flame-c 2.6s ease-in-out infinite;
 }
-.bfox-mark--live .bfox-mark__flame--ci {
-  animation: bfox-flame-ci 2.1s ease-in-out infinite;
+.bbox-mark--live .bbox-mark__flame--ci {
+  animation: bbox-flame-ci 2.1s ease-in-out infinite;
 }
-.bfox-mark--live .bfox-mark__flame--l,
-.bfox-mark--live .bfox-mark__flame--li {
-  animation: bfox-flame-l 2.4s ease-in-out infinite;
+.bbox-mark--live .bbox-mark__flame--l,
+.bbox-mark--live .bbox-mark__flame--li {
+  animation: bbox-flame-l 2.4s ease-in-out infinite;
 }
-.bfox-mark--live .bfox-mark__flame--r,
-.bfox-mark--live .bfox-mark__flame--ri {
-  animation: bfox-flame-r 2.5s ease-in-out infinite;
+.bbox-mark--live .bbox-mark__flame--r,
+.bbox-mark--live .bbox-mark__flame--ri {
+  animation: bbox-flame-r 2.5s ease-in-out infinite;
 }
-.bfox-mark--live .bfox-mark__ember--l {
-  animation: bfox-ember 2.8s ease-in-out infinite;
+.bbox-mark--live .bbox-mark__ember--l {
+  animation: bbox-ember 2.8s ease-in-out infinite;
 }
-.bfox-mark--live .bfox-mark__ember--r {
-  animation: bfox-ember 2.8s ease-in-out infinite 0.4s;
+.bbox-mark--live .bbox-mark__ember--r {
+  animation: bbox-ember 2.8s ease-in-out infinite 0.4s;
 }
 
 /* Rollover: hotter, faster burn */
-.bfox-mark--live:hover .bfox-mark__glow,
-.unlock-brand:hover .bfox-mark--live .bfox-mark__glow,
-.screen-header-left:hover .bfox-mark--live .bfox-mark__glow,
-.loading-screen:hover .bfox-mark--live .bfox-mark__glow {
+.bbox-mark--live:hover .bbox-mark__glow,
+.unlock-brand:hover .bbox-mark--live .bbox-mark__glow,
+.screen-header-left:hover .bbox-mark--live .bbox-mark__glow,
+.loading-screen:hover .bbox-mark--live .bbox-mark__glow {
   transform: scale(1.18);
   filter: brightness(1.25);
 }
 
-.bfox-mark--live:hover .bfox-mark__flame,
-.unlock-brand:hover .bfox-mark--live .bfox-mark__flame,
-.screen-header-left:hover .bfox-mark--live .bfox-mark__flame,
-.loading-screen:hover .bfox-mark--live .bfox-mark__flame {
+.bbox-mark--live:hover .bbox-mark__flame,
+.unlock-brand:hover .bbox-mark--live .bbox-mark__flame,
+.screen-header-left:hover .bbox-mark--live .bbox-mark__flame,
+.loading-screen:hover .bbox-mark--live .bbox-mark__flame {
   animation-duration: 0.55s;
 }
 
-.bfox-mark--live:hover .bfox-mark__ember,
-.unlock-brand:hover .bfox-mark--live .bfox-mark__ember,
-.screen-header-left:hover .bfox-mark--live .bfox-mark__ember {
+.bbox-mark--live:hover .bbox-mark__ember,
+.unlock-brand:hover .bbox-mark--live .bbox-mark__ember,
+.screen-header-left:hover .bbox-mark--live .bbox-mark__ember {
   animation-duration: 0.7s;
   stroke: #ff9a1a;
 }
 
-.bfox-mark--live:hover,
-.unlock-brand:hover .bfox-mark--live,
-.screen-header-left:hover .bfox-mark--live {
+.bbox-mark--live:hover,
+.unlock-brand:hover .bbox-mark--live,
+.screen-header-left:hover .bbox-mark--live {
   filter: drop-shadow(0 0 10px rgba(255, 109, 0, 0.45));
 }
 
-@keyframes bfox-flame-c {
+@keyframes bbox-flame-c {
   0%,
   100% {
     transform: translateY(0) scaleY(1) scaleX(1);
@@ -441,7 +441,7 @@ hr.sep {
   }
 }
 
-@keyframes bfox-flame-ci {
+@keyframes bbox-flame-ci {
   0%,
   100% {
     transform: translateY(0) scaleY(1);
@@ -453,7 +453,7 @@ hr.sep {
   }
 }
 
-@keyframes bfox-flame-l {
+@keyframes bbox-flame-l {
   0%,
   100% {
     transform: translate(0, 0) rotate(0deg) scaleY(1);
@@ -466,7 +466,7 @@ hr.sep {
   }
 }
 
-@keyframes bfox-flame-r {
+@keyframes bbox-flame-r {
   0%,
   100% {
     transform: translate(0, 0) rotate(0deg) scaleY(1);
@@ -479,7 +479,7 @@ hr.sep {
   }
 }
 
-@keyframes bfox-ember {
+@keyframes bbox-ember {
   0%,
   100% {
     opacity: 0.65;
@@ -492,13 +492,13 @@ hr.sep {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bfox-mark--live .bfox-mark__flame,
-  .bfox-mark--live .bfox-mark__ember {
+  .bbox-mark--live .bbox-mark__flame,
+  .bbox-mark--live .bbox-mark__ember {
     animation: none !important;
   }
-  .bfox-mark--live:hover,
-  .unlock-brand:hover .bfox-mark--live,
-  .screen-header-left:hover .bfox-mark--live {
+  .bbox-mark--live:hover,
+  .unlock-brand:hover .bbox-mark--live,
+  .screen-header-left:hover .bbox-mark--live {
     filter: none;
   }
 }
@@ -2171,7 +2171,7 @@ button.jumpa-defi-deposit {
   overflow-y: visible;
 }
 
-/* ── Burning Fox main nav (App-level) ─────────────────────────────── */
+/* ── BurnBox main nav (App-level) ─────────────────────────────────── */
 .bfox-main-tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

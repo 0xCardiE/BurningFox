@@ -9,7 +9,7 @@ const sizes = [16, 32, 48, 128];
 
 mkdirSync(outDir, { recursive: true });
 
-const svgPath = join(outDir, 'burning-fox-logo.svg');
+const svgPath = join(outDir, 'burnbox-logo.svg');
 const svg = readFileSync(svgPath, 'utf8');
 
 for (const w of sizes) {

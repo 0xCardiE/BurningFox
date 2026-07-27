@@ -96,7 +96,7 @@ export function App() {
 
   let shell: ReactNode;
   if (screen === 'load') {
-    shell = <LoadingScreen message="Opening Burning Fox…" />;
+    shell = <LoadingScreen message="Opening BurnBox…" />;
   } else if (screen === 'onboard' || !hasVault) {
     shell = (
       <Onboarding

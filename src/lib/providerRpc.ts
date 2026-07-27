@@ -90,7 +90,7 @@ export async function handleProviderRpc(
     if (method === 'eth_accounts' || method === 'eth_requestAccounts') {
       if (!pk) {
         if (method === 'eth_requestAccounts') {
-          throw Object.assign(new Error('Burning Fox is locked. Unlock the extension first.'), {
+          throw Object.assign(new Error('BurnBox is locked. Unlock the extension first.'), {
             code: 4100,
           });
         }
@@ -108,7 +108,7 @@ export async function handleProviderRpc(
     }
 
     if (!pk) {
-      throw Object.assign(new Error('Burning Fox is locked. Unlock the extension first.'), {
+      throw Object.assign(new Error('BurnBox is locked. Unlock the extension first.'), {
         code: 4100,
       });
     }

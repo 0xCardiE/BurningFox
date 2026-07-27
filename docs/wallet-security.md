@@ -1,6 +1,6 @@
-# Wallet security model (Jumpa extension)
+# Wallet security model (BurnBox extension)
 
-This note describes how signing works in Jumpa, how that compares to MetaMask, and what changes when **everything runs inside the extension** (no ordinary website holding your keys).
+This note describes how signing works in BurnBox, how that compares to MetaMask, and what changes when **everything runs inside the extension** (no ordinary website holding your keys).
 
 ## What the extension does today
 
@@ -13,14 +13,14 @@ So each swap is still “sign + send,” but the **approval UX is “already unl
 
 ## Compared to MetaMask (typical dapp flow)
 
-| Aspect | Jumpa (this extension) | MetaMask (typical) |
+| Aspect | BurnBox (this extension) | MetaMask (typical) |
 |--------|------------------------|---------------------|
 | Where the key lives | Extension: UI + service worker / `chrome.storage.session` while unlocked | Extension: isolated vault; dapp never holds the key |
 | Who signs | Our code calls `signTransaction` after unlock | User confirms in wallet UI; extension signs |
 | Per-tx human gate | Optional: lock / re-unlock; otherwise one tap after unlock | Usually one confirmation per operation |
 | Random website attack surface | **Not** exposing keys to page JS if you only use the extension UI and don’t inject keys into pages | Dapp prompts MetaMask; user reviews in wallet UI |
 
-**Summary:** MetaMask’s main security advantage for end users is **separation + explicit review**: the dapp is untrusted, and the wallet UI is the gate. Jumpa is closer to a **hot wallet inside the extension**: fast UX, but after unlock, **code that runs in the extension context can sign on your behalf** until you lock or auto-lock.
+**Summary:** MetaMask’s main security advantage for end users is **separation + explicit review**: the dapp is untrusted, and the wallet UI is the gate. BurnBox is closer to a **hot wallet inside the extension**: fast UX, but after unlock, **code that runs in the extension context can sign on your behalf** until you lock or auto-lock.
 
 ## Extension-only usage: what gets better
 

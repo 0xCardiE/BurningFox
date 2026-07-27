@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Burning Fox",
+  "name": "BurnBox",
   "version": "2.0.0",
   "description": "Developer EVM burner wallet — swap via LI.FI, multi-send, RPC switcher, and MetaMask-compatible dapp connection.",
   "icons": {
@@ -10,7 +10,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "Burning Fox",
+    "default_title": "BurnBox",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",

@@ -38,7 +38,7 @@ function buildContentScripts(): Plugin {
                   format: 'iife',
                   entryFileNames: `${name}.js`,
                   inlineDynamicImports: true,
-                  name: `BurningFox_${name}`,
+                  name: `BurnBox_${name}`,
                 },
               },
             },

@@ -1,4 +1,4 @@
-# Burning Fox (Chrome extension)
+# BurnBox (Chrome extension)
 
 Developer EVM burner wallet — create/import keys, swap via [LI.FI](https://li.fi), multi-send, RPC switcher, and MetaMask-compatible dapp connection.
 

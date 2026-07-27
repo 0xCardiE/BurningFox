@@ -13,7 +13,7 @@ import {
 } from '../provider/types';
 
 const CONTEXT_DEAD_MSG =
-  'Burning Fox was updated or reloaded. Refresh this page to reconnect.';
+  'BurnBox was updated or reloaded. Refresh this page to reconnect.';
 
 let cachedReplaceMetaMask = true;
 let contextDead = false;

@@ -7,9 +7,9 @@ import {
   type ProviderResponse,
   type WindowProviderEvent,
 } from '../provider/types';
-import { BURNING_FOX_PROVIDER_INFO } from '../lib/constants';
+import { BURNBOX_PROVIDER_INFO } from '../lib/constants';
 
-const BURNING_FOX_FLAG = '__burningFoxInjected';
+const BURNBOX_FLAG = '__burnBoxInjected';
 
 type Listener = (...args: unknown[]) => void;
 
@@ -24,7 +24,9 @@ class ProviderRpcError extends Error {
   }
 }
 
-class BurningFoxProvider {
+class BurnBoxProvider {
+  readonly isBurnBox = true;
+  /** @deprecated Use isBurnBox */
   readonly isBurningFox = true;
   readonly isMetaMask = true;
   readonly _metamask = {
@@ -142,7 +144,7 @@ class BurningFoxProvider {
     const id =
       typeof crypto !== 'undefined' && 'randomUUID' in crypto
         ? crypto.randomUUID()
-        : `bfox-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        : `bbox-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const req: ProviderRequest = { id, method: args.method, params: args.params };
     const result = await new Promise<unknown>((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
@@ -153,7 +155,7 @@ class BurningFoxProvider {
       window.setTimeout(() => {
         if (this.pending.has(id)) {
           this.pending.delete(id);
-          reject(new ProviderRpcError(4900, 'Burning Fox provider request timed out'));
+          reject(new ProviderRpcError(4900, 'BurnBox provider request timed out'));
         }
       }, 120_000);
     });
@@ -251,7 +253,7 @@ class BurningFoxProvider {
   }
 }
 
-function announceEip6963(provider: BurningFoxProvider, replaceMetaMask: boolean): void {
+function announceEip6963(provider: BurnBoxProvider, replaceMetaMask: boolean): void {
   const announceDetail = (info: {
     uuid: string;
     name: string;
@@ -267,17 +269,17 @@ function announceEip6963(provider: BurningFoxProvider, replaceMetaMask: boolean)
 
   const announce = () => {
     announceDetail({
-      uuid: BURNING_FOX_PROVIDER_INFO.uuid,
-      name: BURNING_FOX_PROVIDER_INFO.name,
-      icon: BURNING_FOX_PROVIDER_INFO.icon,
-      rdns: BURNING_FOX_PROVIDER_INFO.rdns,
+      uuid: BURNBOX_PROVIDER_INFO.uuid,
+      name: BURNBOX_PROVIDER_INFO.name,
+      icon: BURNBOX_PROVIDER_INFO.icon,
+      rdns: BURNBOX_PROVIDER_INFO.rdns,
     });
     /* Wallet modals often filter for MetaMask by rdns — surface ourselves there in drop-in mode. */
     if (replaceMetaMask) {
       announceDetail({
-        uuid: 'burning-fox-metamask-dropin-2026',
+        uuid: 'burnbox-metamask-dropin-2026',
         name: 'MetaMask',
-        icon: BURNING_FOX_PROVIDER_INFO.icon,
+        icon: BURNBOX_PROVIDER_INFO.icon,
         rdns: 'io.metamask',
       });
     }
@@ -291,8 +293,8 @@ function announceEip6963(provider: BurningFoxProvider, replaceMetaMask: boolean)
 }
 
 function installEthereumShim(
-  w: Window & { ethereum?: BurningFoxProvider & { providers?: unknown[] } },
-  provider: BurningFoxProvider,
+  w: Window & { ethereum?: BurnBoxProvider & { providers?: unknown[] } },
+  provider: BurnBoxProvider,
 ): void {
   const legacy = w.ethereum;
   const legacyList: unknown[] =
@@ -311,7 +313,7 @@ function installEthereumShim(
           return provider;
         },
         set(next) {
-          if (next && (next as BurningFoxProvider).isBurningFox) return;
+          if (next && (next as BurnBoxProvider).isBurnBox) return;
           if (next && !legacyList.includes(next)) legacyList.push(next);
         },
       });
@@ -336,21 +338,24 @@ function installEthereumShim(
   window.dispatchEvent(new Event('ethereum#initialized'));
 }
 
-function installProvider(replaceMetaMask: boolean): BurningFoxProvider {
+function installProvider(replaceMetaMask: boolean): BurnBoxProvider {
   const w = window as Window & {
-    ethereum?: BurningFoxProvider & { providers?: unknown[] };
-    burningFox?: BurningFoxProvider;
-    [BURNING_FOX_FLAG]?: boolean;
+    ethereum?: BurnBoxProvider & { providers?: unknown[] };
+    burnBox?: BurnBoxProvider;
+    burningFox?: BurnBoxProvider;
+    [BURNBOX_FLAG]?: boolean;
   };
 
-  if (w[BURNING_FOX_FLAG] && w.burningFox) {
-    announceEip6963(w.burningFox, replaceMetaMask);
-    if (replaceMetaMask) installEthereumShim(w, w.burningFox);
-    return w.burningFox;
+  if (w[BURNBOX_FLAG] && w.burnBox) {
+    announceEip6963(w.burnBox, replaceMetaMask);
+    if (replaceMetaMask) installEthereumShim(w, w.burnBox);
+    return w.burnBox;
   }
 
-  w[BURNING_FOX_FLAG] = true;
-  const provider = new BurningFoxProvider();
+  w[BURNBOX_FLAG] = true;
+  const provider = new BurnBoxProvider();
+  w.burnBox = provider;
+  /* Compat alias for older pages/scripts. */
   w.burningFox = provider;
 
   if (replaceMetaMask) {
