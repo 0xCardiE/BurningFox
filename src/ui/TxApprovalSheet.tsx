@@ -1,10 +1,196 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { getAddress } from 'viem';
+import { getUnlockedAccount } from '../lib/accountSession';
+import {
+  approvalTitle,
+  buildApprovalDetailSections,
+  mergeGasPreview,
+  type ApprovalDetailField,
+  type ApprovalDetailSection,
+  type TxGasPreview,
+} from '../lib/approvalDetails';
 import { chainById } from '../lib/chainCatalog';
+import { chainJsonRpcCall } from '../lib/ethereum';
 import {
   fetchPendingApprovals,
   resolvePendingApproval,
 } from '../lib/approvalBridge';
 import type { PendingApproval } from '../lib/pendingApprovals';
+
+function CopyBtn({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function onCopy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return (
+    <button type="button" className="bfox-tx-approval__copy" onClick={() => void onCopy()}>
+      {copied ? 'Copied' : 'Copy'}
+    </button>
+  );
+}
+
+function DetailField({ f }: { f: ApprovalDetailField }) {
+  return (
+    <div className={`bfox-tx-approval__field${f.warn ? ' bfox-tx-approval__field--warn' : ''}`}>
+      <dt>{f.label}</dt>
+      <dd className={f.mono ? 'bfox-tx-approval__mono' : undefined}>
+        <span className="bfox-tx-approval__value">{f.value}</span>
+        {f.copyable ? <CopyBtn text={f.value} /> : null}
+      </dd>
+    </div>
+  );
+}
+
+function DetailSection({ section }: { section: ApprovalDetailSection }) {
+  const [open, setOpen] = useState(section.defaultOpen ?? false);
+
+  return (
+    <section className="bfox-tx-approval__section">
+      <button
+        type="button"
+        className="bfox-tx-approval__section-head"
+        aria-expanded={open}
+        onClick={() => setOpen(v => !v)}
+      >
+        <span>{section.title}</span>
+        <span className="bfox-tx-approval__chev" aria-hidden>
+          {open ? '▾' : '▸'}
+        </span>
+      </button>
+      {open ? (
+        <dl className="bfox-tx-approval__fields">
+          {section.fields.map(field => (
+            <DetailField key={`${section.id}-${field.label}`} f={field} />
+          ))}
+        </dl>
+      ) : null}
+    </section>
+  );
+}
+
+async function fetchTxGasPreview(
+  chainId: number,
+  tx: Record<string, unknown>,
+  from: string,
+): Promise<TxGasPreview> {
+  const preview: TxGasPreview = {};
+  try {
+    preview.pendingNonce = String(
+      Number.parseInt(
+        await chainJsonRpcCall<string>(chainId, 'eth_getTransactionCount', [from, 'pending']),
+        16,
+      ),
+    );
+  } catch (e) {
+    preview.error = e instanceof Error ? e.message : String(e);
+  }
+
+  try {
+    const to = typeof tx.to === 'string' ? tx.to : undefined;
+    const data = typeof tx.data === 'string' ? tx.data : '0x';
+    const value = typeof tx.value === 'string' ? tx.value : '0x0';
+    const gasHex = await chainJsonRpcCall<string>(chainId, 'eth_estimateGas', [
+      { from, to, data, value },
+    ]);
+    preview.estimatedGas = String(Number.parseInt(gasHex, 16));
+  } catch (e) {
+    if (!preview.error) {
+      preview.error = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  try {
+    const gasPriceHex = await chainJsonRpcCall<string>(chainId, 'eth_gasPrice', []);
+    preview.suggestedGasPrice = String(BigInt(gasPriceHex));
+  } catch {
+    /* optional */
+  }
+
+  if (typeof tx.to === 'string' && tx.to.startsWith('0x')) {
+    try {
+      const code = await chainJsonRpcCall<string>(chainId, 'eth_getCode', [tx.to, 'latest']);
+      preview.isContract = code !== '0x' && code !== '0x0';
+    } catch {
+      /* optional */
+    }
+  }
+
+  return preview;
+}
+
+function ApprovalContent({ pending }: { pending: PendingApproval }) {
+  const account = getUnlockedAccount();
+  const walletAddress = account ? getAddress(account.address) : undefined;
+  const chain = chainById(pending.chainId);
+  const [gasPreview, setGasPreview] = useState<TxGasPreview | null>(null);
+
+  const sections = useMemo(() => {
+    let built = buildApprovalDetailSections(
+      pending.request,
+      pending.chainId,
+      walletAddress,
+    );
+    if (gasPreview) {
+      built = mergeGasPreview(built, gasPreview, pending.chainId);
+    }
+    return built;
+  }, [pending.request, pending.chainId, walletAddress, gasPreview]);
+
+  useEffect(() => {
+    if (pending.request.method !== 'eth_sendTransaction' || !walletAddress) {
+      setGasPreview(null);
+      return;
+    }
+    const tx = (pending.request.params?.[0] ?? {}) as Record<string, unknown>;
+    let cancelled = false;
+    void fetchTxGasPreview(pending.chainId, tx, walletAddress).then(p => {
+      if (!cancelled) setGasPreview(p);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [pending.id, pending.request, pending.chainId, walletAddress]);
+
+  const hostname = pending.summary.hostname;
+
+  return (
+    <>
+      <div className="bfox-tx-approval__body">
+        {hostname ? (
+          <p className="bfox-tx-approval__site">
+            Request from <strong>{hostname}</strong>
+            {pending.origin ? (
+              <span className="bfox-tx-approval__origin muted"> · {pending.origin}</span>
+            ) : null}
+          </p>
+        ) : null}
+        {chain ? (
+          <p className="bfox-tx-approval__chain muted">
+            Network · {chain.name} (chainId {pending.chainId})
+          </p>
+        ) : null}
+
+        <p className="bfox-tx-approval__dev-note muted">
+          Developer view — inspect gas, calldata, and raw RPC params before signing.
+        </p>
+
+        <div className="bfox-tx-approval__sections">
+          {sections.map(section => (
+            <DetailSection key={section.id} section={section} />
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
 
 export function TxApprovalSheet() {
   const [pending, setPending] = useState<PendingApproval | null>(null);
@@ -24,8 +210,7 @@ export function TxApprovalSheet() {
 
   if (!pending) return null;
 
-  const { summary } = pending;
-  const chainName = chainById(pending.chainId)?.name;
+  const title = approvalTitle(pending.request);
 
   async function onDecision(approved: boolean) {
     if (!pending || busy) return;
@@ -51,31 +236,13 @@ export function TxApprovalSheet() {
       >
         <div className="jumpa-sheet-head">
           <h2 id="tx-approval-title" className="jumpa-sheet-h2">
-            {summary.title}
+            {title}
           </h2>
         </div>
 
-        <div className="bfox-tx-approval__body">
-          {summary.hostname ? (
-            <p className="bfox-tx-approval__site">
-              Request from <strong>{summary.hostname}</strong>
-            </p>
-          ) : null}
-          {chainName ? (
-            <p className="bfox-tx-approval__chain muted">Network · {chainName}</p>
-          ) : null}
+        <ApprovalContent pending={pending} />
 
-          <dl className="bfox-tx-approval__fields">
-            {summary.fields.map(field => (
-              <div key={field.label} className="bfox-tx-approval__field">
-                <dt>{field.label}</dt>
-                <dd>{field.value}</dd>
-              </div>
-            ))}
-          </dl>
-
-          {err ? <p className="error">{err}</p> : null}
-        </div>
+        {err ? <p className="error bfox-tx-approval__err">{err}</p> : null}
 
         <div className="bfox-tx-approval__actions">
           <button

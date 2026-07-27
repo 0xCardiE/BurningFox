@@ -188,14 +188,23 @@ export function BfoxSegmented({
   onChange,
   options,
   ariaLabel = 'Options',
+  className,
+  title,
 }: {
   value: string;
   onChange: (v: string) => void;
   options: { value: string; label: string }[];
   ariaLabel?: string;
+  className?: string;
+  title?: string;
 }) {
   return (
-    <div className="bfox-seg" role="tablist" aria-label={ariaLabel}>
+    <div
+      className={`bfox-seg${className ? ` ${className}` : ''}`}
+      role="tablist"
+      aria-label={ariaLabel}
+      title={title}
+    >
       {options.map(opt => (
         <button
           key={opt.value}

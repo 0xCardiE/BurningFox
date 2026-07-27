@@ -6,7 +6,12 @@ import {
   type TxConfirmMode,
 } from '../lib/storageState';
 
-export function TxConfirmModeBar({
+const MODE_HINTS: Record<TxConfirmMode, string> = {
+  speed: 'Transactions confirm automatically when unlocked.',
+  normal: 'Review and confirm each dapp request.',
+};
+
+export function TxConfirmModeToggle({
   settings,
   onSaved,
 }: {
@@ -21,21 +26,16 @@ export function TxConfirmModeBar({
   }
 
   return (
-    <div className="bfox-tx-mode" aria-label="Transaction confirmation mode">
-      <BfoxSegmented
-        value={mode}
-        onChange={onChange}
-        ariaLabel="Transaction confirmation mode"
-        options={[
-          { value: 'speed', label: 'Speed up' },
-          { value: 'normal', label: 'Normal' },
-        ]}
-      />
-      <p className="bfox-tx-mode__hint">
-        {mode === 'speed'
-          ? 'Transactions confirm automatically when unlocked.'
-          : 'Review and confirm each dapp request.'}
-      </p>
-    </div>
+    <BfoxSegmented
+      className="bfox-seg--compact"
+      value={mode}
+      onChange={onChange}
+      ariaLabel="Transaction confirmation mode"
+      title={MODE_HINTS[mode]}
+      options={[
+        { value: 'speed', label: 'Turbo' },
+        { value: 'normal', label: 'Normal' },
+      ]}
+    />
   );
 }

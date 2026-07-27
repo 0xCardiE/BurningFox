@@ -8,6 +8,7 @@ import { chainById } from '../lib/chainCatalog';
 import { effectiveActiveChainId, type AppSettings } from '../lib/storageState';
 import { isUnlocked } from '../lib/accountSession';
 import { useCallback, useEffect, useState } from 'react';
+import { TxConfirmModeToggle } from './TxConfirmModeBar';
 
 function SiteIcon({ favIconUrl, label, connected }: { favIconUrl?: string; label: string; connected: boolean }) {
   const letter = label.trim().charAt(0).toUpperCase() || '?';
@@ -23,7 +24,13 @@ function SiteIcon({ favIconUrl, label, connected }: { favIconUrl?: string; label
   );
 }
 
-export function DappConnectionBar({ settings }: { settings: AppSettings }) {
+export function DappConnectionBar({
+  settings,
+  onSaved,
+}: {
+  settings: AppSettings;
+  onSaved: () => void;
+}) {
   const [status, setStatus] = useState<DappConnectionStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -115,6 +122,7 @@ export function DappConnectionBar({ settings }: { settings: AppSettings }) {
       </div>
 
       <div className="bfox-dapp-bar__actions">
+        <TxConfirmModeToggle settings={settings} onSaved={onSaved} />
         {connected ? (
           <button
             type="button"
