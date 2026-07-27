@@ -1,0 +1,1882 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { formatUnits, getAddress, parseUnits } from 'viem';
+import { getQuote, getStatus, getTokens, getWalletBalances } from '@lifi/sdk';
+import { ChainType, CoinKey, TokenTag } from '@lifi/types';
+import type { ExtendedChain, LiFiStep, Token, TokenExtended } from '@lifi/types';
+import { getUnlockedAccount } from '../lib/accountSession';
+import type { AppSettings } from '../lib/storageState';
+import { effectiveSlippageRatio } from '../lib/storageState';
+import { sortEvmChainIds, sortExtendedChains } from '../lib/chainPopularity';
+import { loadEvmMainnetChains } from '../lib/lifiBootstrap';
+import { summarizeApiError } from '../lib/errors';
+import {
+  ensureErc20Allowance,
+  sendTransactionRequest,
+  snapshotHeldTokensOnChain,
+  waitForChainReceipt,
+} from '../lib/ethereum';
+import type { OnChainBalanceProbe } from '../lib/ethereum';
+import { transactionExplorerUrl } from '../lib/explorerUrls';
+import { appendSwapToHistory, loadSwapHistory, type SwapHistoryEntry } from '../lib/swapHistory';
+import { loadSwapUi, saveSwapUi } from '../lib/swapUiPersist';
+import { ScreenHeader } from './ScreenHeader';
+import { JumpaLiFiIcon } from './JumpaLiFiIcon';
+import { JumpaTokenWithBadge } from './JumpaTokenWithBadge';
+import { DefiYieldPanel } from './DefiYieldPanel';
+
+type WalletTab = 'swap' | 'defi' | 'history';
+
+/** Prefer on-chain RPC snapshot for these chains vs stale LiFi `getWalletBalances`. */
+const RPC_BALANCE_OVERRIDE_TTL_MS = 120_000;
+
+type BalEntry = {
+  address: string;
+  symbol: string;
+  decimals: number;
+  amount: string;
+  chainId: number;
+  name: string;
+  priceUSD?: string;
+  logoURI?: string;
+};
+
+const ZERO = '0x0000000000000000000000000000000000000000';
+const ETH_PLACEHOLDER = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+
+function isNativeToken(addr: string): boolean {
+  const a = addr.toLowerCase();
+  return a === ZERO || a === ETH_PLACEHOLDER;
+}
+
+function tokenKeyForQuote(addr: string): string {
+  try {
+    return isNativeToken(addr) ? addr : getAddress(addr);
+  } catch {
+    return addr;
+  }
+}
+
+function fmtNum(n: number, d = 6): string {
+  if (!Number.isFinite(n)) return '—';
+  if (n >= 1 || n === 0) return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+  return n.toLocaleString(undefined, { maximumSignificantDigits: d });
+}
+
+/** @returns true when string is a plausible positive decimal amount */
+function parseHumanAmount(s: string): { ok: true; raw: string } | { ok: false; reason: string } {
+  const t = s.trim().replace(/\s/g, '');
+  if (!t) return { ok: false, reason: 'Enter an amount.' };
+  if (!/^\d*(\.\d+)?$/.test(t))
+    return { ok: false, reason: 'Use digits and at most one decimal point.' };
+  const n = Number(t);
+  if (!Number.isFinite(n) || n <= 0)
+    return { ok: false, reason: 'Amount must be greater than zero.' };
+  return { ok: true, raw: t };
+}
+
+function addressesMatchPayToken(a: string, b: string): boolean {
+  if (isNativeToken(a) && isNativeToken(b)) return true;
+  try {
+    return getAddress(a).toLowerCase() === getAddress(b).toLowerCase();
+  } catch {
+    return a.toLowerCase() === b.toLowerCase();
+  }
+}
+
+function normalizeLower(addr: string): string {
+  try {
+    return getAddress(addr).toLowerCase();
+  } catch {
+    return addr.toLowerCase();
+  }
+}
+
+function buildBalanceMaps(bals: BalEntry[]): {
+  native?: BalEntry;
+  byAddr: Map<string, BalEntry>;
+} {
+  const byAddr = new Map<string, BalEntry>();
+  let native: BalEntry | undefined;
+  for (const b of bals) {
+    const lo = b.address.toLowerCase();
+    byAddr.set(lo, b);
+    try {
+      byAddr.set(getAddress(b.address).toLowerCase(), b);
+    } catch {
+      /* ignore */
+    }
+    if (isNativeToken(b.address)) native = b;
+  }
+  return { native, byAddr };
+}
+
+function balanceForLiToken(
+  t: Token,
+  maps: ReturnType<typeof buildBalanceMaps>
+): BalEntry | undefined {
+  if (isNativeToken(t.address)) return maps.native;
+  const lo = t.address.toLowerCase();
+  return maps.byAddr.get(lo) ?? maps.byAddr.get(normalizeLower(t.address));
+}
+
+function tokenToBalEntry(t: Token, chainId: number, bal?: BalEntry): BalEntry {
+  return {
+    address: t.address,
+    symbol: t.symbol,
+    decimals: t.decimals,
+    amount: bal?.amount ?? '0',
+    chainId,
+    name: t.name,
+    logoURI: t.logoURI ?? bal?.logoURI,
+    priceUSD: bal?.priceUSD ?? t.priceUSD,
+  };
+}
+
+/** Minimal Li.FI `Token` built from a balance row (used when flipping pair on the same chain). */
+function balEntryToToken(b: BalEntry): Token {
+  return {
+    address: b.address,
+    chainId: b.chainId,
+    decimals: b.decimals,
+    symbol: b.symbol,
+    name: b.name,
+    logoURI: b.logoURI,
+    priceUSD: b.priceUSD,
+  } as Token;
+}
+
+function dedupeTokensForChain(tokens: Token[], chainId: number): Token[] {
+  const seen = new Set<string>();
+  const out: Token[] = [];
+  for (const t of tokens) {
+    const k = isNativeToken(t.address) ? `native:${chainId}` : normalizeLower(t.address);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(t);
+  }
+  return out;
+}
+
+/** LiFi extended token fields when `getTokens({ extended: true })`. */
+type TokenWithLiquidity = Token & Partial<Pick<TokenExtended, 'volumeUSD24H' | 'marketCapUSD'>>;
+
+function tokenHasTag(t: Token, tag: TokenTag): boolean {
+  return (t.tags ?? []).includes(tag);
+}
+
+const WRAPPED_MAJOR_KEYS = new Set<string>([CoinKey.WETH, CoinKey.WBTC]);
+
+const STABLE_COIN_KEYS = new Set<string>([
+  CoinKey.USDT,
+  CoinKey.USDC,
+  CoinKey.DAI,
+  CoinKey.BUSD,
+  CoinKey.USDCe,
+  CoinKey.USDCn,
+  CoinKey.USDe,
+  CoinKey.USDB,
+  CoinKey.FRAX,
+  CoinKey.FDUSD,
+  CoinKey.GHO,
+  CoinKey.HONEY,
+  CoinKey.BYUSD,
+  CoinKey.FEUSD,
+  CoinKey.USDT0,
+  CoinKey.AXLUSDC,
+  CoinKey.USDF,
+  CoinKey.USDm,
+  CoinKey.PathUSD,
+  CoinKey.USD1,
+]);
+
+/**
+ * Groups for default ordering within the same wallet-balance bracket.
+ * Lower = closer to top: native gas, majors & wraps, stablecoins, other tagged majors, everything else + volume/mcap from LiFi.
+ */
+function pinTier(t: Token): number {
+  if (isNativeToken(t.address)) return 0;
+  const ck = t.coinKey;
+  if (ck && WRAPPED_MAJOR_KEYS.has(ck)) return 0;
+  if (tokenHasTag(t, TokenTag.STABLECOIN) || (ck && STABLE_COIN_KEYS.has(ck))) return 1;
+  if (tokenHasTag(t, TokenTag.MAJOR_ASSET)) return 2;
+  return 3;
+}
+
+function liquidityScore(t: TokenWithLiquidity): number {
+  const v = t.volumeUSD24H;
+  const m = t.marketCapUSD;
+  const vv = typeof v === 'number' && Number.isFinite(v) ? v : 0;
+  const mm = typeof m === 'number' && Number.isFinite(m) ? m : 0;
+  return vv + mm * 0.02;
+}
+
+function compareTokensByPopularity(a: Token, b: Token): number {
+  const pa = pinTier(a);
+  const pb = pinTier(b);
+  if (pa !== pb) return pa - pb;
+  const la = liquidityScore(a);
+  const lb = liquidityScore(b);
+  if (lb !== la) return lb > la ? 1 : -1;
+  return a.symbol.localeCompare(b.symbol);
+}
+
+function compareFromPickerRows(a: Token, rowA: BalEntry, b: Token, rowB: BalEntry): number {
+  const balA = safeBigIntAmount(rowA.amount) > 0n ? 1 : 0;
+  const balB = safeBigIntAmount(rowB.amount) > 0n ? 1 : 0;
+  if (balB !== balA) return balB - balA;
+  return compareTokensByPopularity(a, b);
+}
+
+function safeBigIntAmount(s: string): bigint {
+  try {
+    return BigInt(s || '0');
+  } catch {
+    return 0n;
+  }
+}
+
+function formatSwapHistoryRelTime(at: number): string {
+  const d = Date.now() - at;
+  if (d < 45_000) return 'Just now';
+  if (d < 3_600_000) return `${Math.floor(d / 60_000)}m ago`;
+  if (d < 86_400_000) return `${Math.floor(d / 3_600_000)}h ago`;
+  return new Date(at).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function balEntryToProbe(b: BalEntry): OnChainBalanceProbe {
+  return {
+    address: b.address,
+    decimals: b.decimals,
+    symbol: b.symbol,
+    name: b.name,
+    logoURI: b.logoURI,
+    priceUSD: b.priceUSD,
+  };
+}
+
+function tokenToProbe(t: Token): OnChainBalanceProbe {
+  return {
+    address: t.address,
+    decimals: t.decimals,
+    symbol: t.symbol,
+    name: t.name,
+    logoURI: t.logoURI,
+    priceUSD: t.priceUSD != null ? String(t.priceUSD) : undefined,
+  };
+}
+
+function compareBalEntriesByBalanceThenSymbol(a: BalEntry, b: BalEntry): number {
+  const ba = safeBigIntAmount(a.amount) > 0n ? 1 : 0;
+  const bb = safeBigIntAmount(b.amount) > 0n ? 1 : 0;
+  if (bb !== ba) return bb - ba;
+  return a.symbol.localeCompare(b.symbol);
+}
+
+function SwapExecLog({
+  log,
+  tx,
+  chainById,
+}: {
+  log: string;
+  tx: { chainId: number; hash: `0x${string}` } | null;
+  chainById: Map<number, ExtendedChain>;
+}) {
+  const chain = tx ? chainById.get(tx.chainId) : undefined;
+  const url = tx ? transactionExplorerUrl(tx.chainId, tx.hash, chain) : undefined;
+  const explorerHint = chain?.name != null ? `${chain.name} explorer` : 'Block explorer';
+
+  if (url && tx && log.includes(tx.hash)) {
+    const i = log.indexOf(tx.hash);
+    return (
+      <div className="jumpa-exec-log">
+        <p className="jumpa-exec-log__text">
+          {log.slice(0, i)}
+          <a href={url} target="_blank" rel="noopener noreferrer" className="jumpa-tx-link mono">
+            {tx.hash}
+          </a>
+          {log.slice(i + tx.hash.length)}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="jumpa-exec-log">
+      <p className="jumpa-exec-log__text">{log}</p>
+      {url && tx ? (
+        <p className="jumpa-exec-log__sub">
+          <a href={url} target="_blank" rel="noopener noreferrer" className="jumpa-tx-link">
+            Open in {explorerHint} ↗
+          </a>
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+export function SwapView({
+  settings,
+  onOpenSettings,
+  embedded = false,
+}: {
+  settings: AppSettings;
+  onOpenSettings?: () => void;
+  embedded?: boolean;
+}) {
+  const account = getUnlockedAccount();
+  const addr = account?.address;
+
+  const [evmChains, setEvmChains] = useState<ExtendedChain[]>([]);
+  const [balancesRecord, setBalancesRecord] = useState<Record<number, BalEntry[]> | null>(null);
+  const [balancesErr, setBalancesErr] = useState<string | null>(null);
+  const [balancesBusy, setBalancesBusy] = useState(true);
+
+  const [fromChainId, setFromChainId] = useState<number | null>(null);
+  const [toChainId, setToChainId] = useState<number | null>(null);
+  const [fromToken, setFromToken] = useState<BalEntry | null>(null);
+  const [toToken, setToToken] = useState<Token | null>(null);
+  const [toSearch, setToSearch] = useState('');
+
+  const [destTokens, setDestTokens] = useState<Token[] | null>(null);
+  const [destErr, setDestErr] = useState<string | null>(null);
+  const [destBusy, setDestBusy] = useState(false);
+
+  const [sourceTokens, setSourceTokens] = useState<Token[] | null>(null);
+  const [sourceTokensBusy, setSourceTokensBusy] = useState(false);
+  const [sourceTokensErr, setSourceTokensErr] = useState<string | null>(null);
+
+  const [amountStr, setAmountStr] = useState('');
+  const [quote, setQuote] = useState<LiFiStep | null>(null);
+  const [quoteErr, setQuoteErr] = useState<string | null>(null);
+  const [quoteBusy, setQuoteBusy] = useState(false);
+  /** After a completed swap, show a non-actionable "Success" until the form changes. */
+  const [swapSuccessCta, setSwapSuccessCta] = useState(false);
+
+  const [execBusy, setExecBusy] = useState(false);
+  const [execLog, setExecLog] = useState<string | null>(null);
+  const [execTx, setExecTx] = useState<{ chainId: number; hash: `0x${string}` } | null>(null);
+
+  type Sheet = null | 'fromNet' | 'fromToken' | 'toNet' | 'toToken';
+  const [sheet, setSheet] = useState<Sheet>(null);
+  const [fromNetSearch, setFromNetSearch] = useState('');
+  const [toNetSearch, setToNetSearch] = useState('');
+  const [fromTokenSearch, setFromTokenSearch] = useState('');
+  const [swapHistory, setSwapHistory] = useState<SwapHistoryEntry[]>([]);
+  const [walletTab, setWalletTab] = useState<WalletTab>('swap');
+
+  const statusTimer = useRef<number | null>(null);
+  const balanceRetryTimersRef = useRef<number[]>([]);
+  /** After a pair flip, restore "from" token once `fromChoices` is ready for the new chain. */
+  const flipPreferredFromBalRef = useRef<BalEntry | null>(null);
+  /** After a pair flip, pick destination token by address once `toChainId` catalog loads. */
+  const flipPreferredToTokenRef = useRef<{ chainId: number; address: string } | null>(null);
+
+  /** Re-apply persisted "from" token once `fromChoices` is ready after popup reopen. */
+  const persistRestoreFromRef = useRef<{ chainId: number; address: string } | null>(null);
+  /** Re-apply persisted "to" token once destination catalog loads. */
+  const persistRestoreToRef = useRef<{ chainId: number; address: string } | null>(null);
+
+  const balancesRecordRef = useRef<Record<number, BalEntry[]> | null>(null);
+  const rpcFreshRef = useRef<Map<number, { at: number; rows: BalEntry[] }>>(new Map());
+
+  const [swapUiHydrated, setSwapUiHydrated] = useState(false);
+
+  const slippageRatio = effectiveSlippageRatio(settings);
+
+  const reloadBalances = useCallback(async () => {
+    if (!addr) return;
+    setBalancesBusy(true);
+    setBalancesErr(null);
+    try {
+      const raw = await getWalletBalances(addr);
+      const out: Record<number, BalEntry[]> = {};
+      for (const [k, list] of Object.entries(raw ?? {})) {
+        const id = Number(k);
+        if (!Number.isFinite(id)) continue;
+        out[id] = (list as BalEntry[]).filter(t => {
+          try {
+            const a = BigInt(t.amount || '0');
+            return a > 0n;
+          } catch {
+            return false;
+          }
+        });
+      }
+      const now = Date.now();
+      for (const [cid, pack] of [...rpcFreshRef.current.entries()]) {
+        if (now - pack.at >= RPC_BALANCE_OVERRIDE_TTL_MS) {
+          rpcFreshRef.current.delete(cid);
+        }
+      }
+      const merged: Record<number, BalEntry[]> = { ...out };
+      for (const [cid, pack] of rpcFreshRef.current.entries()) {
+        if (now - pack.at < RPC_BALANCE_OVERRIDE_TTL_MS) {
+          merged[cid] = pack.rows;
+        }
+      }
+      setBalancesRecord(merged);
+    } catch (e) {
+      setBalancesRecord(null);
+      setBalancesErr(summarizeApiError(e));
+    } finally {
+      setBalancesBusy(false);
+    }
+  }, [addr]);
+
+  useEffect(() => {
+    balancesRecordRef.current = balancesRecord;
+  }, [balancesRecord]);
+
+  const commitRpcSnapshotForChains = useCallback(
+    async (specs: Array<{ chainId: number; extras: Token[] }>) => {
+      if (!addr) return;
+      const holder = getAddress(addr);
+      const prev = balancesRecordRef.current;
+      const updates = new Map<number, BalEntry[]>();
+      for (const { chainId, extras } of specs) {
+        try {
+          const probeMap = new Map<string, OnChainBalanceProbe>();
+          for (const b of prev?.[chainId] ?? []) {
+            probeMap.set(b.address.toLowerCase(), balEntryToProbe(b));
+          }
+          for (const t of extras) {
+            const k = t.address.toLowerCase();
+            if (!probeMap.has(k)) probeMap.set(k, tokenToProbe(t));
+          }
+          const rowsRpc = await snapshotHeldTokensOnChain(chainId, holder, [...probeMap.values()]);
+          updates.set(
+            chainId,
+            rowsRpc.map(r => ({ ...r }))
+          );
+        } catch {
+          /* RPC or registry gap */
+        }
+      }
+      if (updates.size === 0) return;
+      const stamp = Date.now();
+      setBalancesRecord(curr => {
+        const base = { ...(curr ?? {}) };
+        for (const [cid, rows] of updates) {
+          rpcFreshRef.current.set(cid, { at: stamp, rows });
+          if (rows.length === 0) delete base[cid];
+          else base[cid] = rows;
+        }
+        return base;
+      });
+    },
+    [addr]
+  );
+
+  const clearBalanceRetryTimers = useCallback(() => {
+    for (const id of balanceRetryTimersRef.current) {
+      window.clearTimeout(id);
+    }
+    balanceRetryTimersRef.current = [];
+  }, []);
+
+  /** LiFi wallet balances often lag the chain; also cross-chain output arrives after the source receipt. */
+  const scheduleStaggeredBalanceReload = useCallback(() => {
+    if (!addr) return;
+    clearBalanceRetryTimers();
+    for (const ms of [0, 1_500, 5_000, 12_000, 30_000, 60_000]) {
+      const id = window.setTimeout(() => {
+        void reloadBalances();
+      }, ms);
+      balanceRetryTimersRef.current.push(id);
+    }
+  }, [addr, clearBalanceRetryTimers, reloadBalances]);
+
+  useEffect(() => {
+    void reloadBalances();
+  }, [reloadBalances]);
+
+  useEffect(() => {
+    if (sheet === 'fromToken' || sheet === 'toToken') void reloadBalances();
+  }, [sheet, reloadBalances]);
+
+  /**
+   * Probe the active "from" chain via Multicall3 as soon as we know the chain and
+   * have a source-token catalog — covers idle screens that never trigger a swap.
+   */
+  const snapshotActiveFromChain = useCallback(() => {
+    if (fromChainId == null) return;
+    const extras = (sourceTokens ?? []).slice(0, 60);
+    void commitRpcSnapshotForChains([{ chainId: fromChainId, extras }]);
+  }, [commitRpcSnapshotForChains, fromChainId, sourceTokens]);
+
+  useEffect(() => {
+    if (fromChainId == null) return;
+    if (!sourceTokens || sourceTokens.length === 0) return;
+    snapshotActiveFromChain();
+  }, [fromChainId, sourceTokens, snapshotActiveFromChain]);
+
+  useEffect(() => {
+    void loadSwapHistory()
+      .then(rows => setSwapHistory(rows))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    let cancel = false;
+    void (async () => {
+      try {
+        const chains = await loadEvmMainnetChains();
+        if (cancel) return;
+        setEvmChains(chains);
+      } catch (e) {
+        if (!cancel) setBalancesErr(x => x ?? summarizeApiError(e));
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, []);
+
+  const chainChoices = useMemo(() => {
+    if (!evmChains.length) return [];
+    const baseIds = evmChains.map(c => c.id);
+    const merged =
+      balancesRecord == null
+        ? baseIds
+        : [...new Set([...baseIds, ...Object.keys(balancesRecord).map(Number)])];
+    return sortEvmChainIds(merged, evmChains, {
+      balanceFirst: balancesRecord != null,
+      balancesByChain: balancesRecord,
+    });
+  }, [balancesRecord, evmChains]);
+
+  useEffect(() => {
+    if (!addr) return;
+    setSwapUiHydrated(false);
+    setQuote(null);
+    setQuoteErr(null);
+    setSwapSuccessCta(false);
+    setExecLog(null);
+    setExecTx(null);
+    persistRestoreFromRef.current = null;
+    persistRestoreToRef.current = null;
+    flipPreferredFromBalRef.current = null;
+    flipPreferredToTokenRef.current = null;
+    setFromChainId(null);
+    setToChainId(null);
+    setFromToken(null);
+    setToToken(null);
+    setAmountStr('');
+  }, [addr]);
+
+  useEffect(() => {
+    if (!addr || evmChains.length === 0) return;
+    const walletLower = getAddress(addr).toLowerCase();
+    let cancelled = false;
+    void loadSwapUi(walletLower).then(saved => {
+      if (cancelled) return;
+      if (!saved) {
+        setSwapUiHydrated(true);
+        return;
+      }
+      const ids = new Set(evmChains.map(c => c.id));
+      let fromId = saved.fromChainId;
+      let toId = saved.toChainId;
+      if (!ids.has(fromId)) fromId = evmChains[0]!.id;
+      if (!ids.has(toId)) toId = fromId;
+      setFromChainId(fromId);
+      setToChainId(toId);
+      setAmountStr(saved.amountStr);
+      persistRestoreFromRef.current = { chainId: fromId, address: saved.fromTokenAddress };
+      persistRestoreToRef.current = { chainId: toId, address: saved.toTokenAddress };
+      setSwapUiHydrated(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [addr, evmChains]);
+
+  useEffect(() => {
+    if (!swapUiHydrated) return;
+    if (!fromChainId && chainChoices.length) {
+      setFromChainId(chainChoices[0]!);
+    }
+  }, [swapUiHydrated, chainChoices, fromChainId]);
+
+  useEffect(() => {
+    if (!swapUiHydrated) return;
+    if (fromChainId != null && toChainId == null) {
+      setToChainId(fromChainId);
+    }
+  }, [swapUiHydrated, fromChainId, toChainId]);
+
+  useEffect(() => {
+    if (!swapUiHydrated || !addr) return;
+    if (fromChainId == null || toChainId == null || !fromToken || !toToken) return;
+    const walletLower = getAddress(addr).toLowerCase();
+    const row = {
+      fromChainId,
+      toChainId,
+      fromTokenAddress: fromToken.address,
+      toTokenAddress: toToken.address,
+      amountStr,
+    };
+    const t = window.setTimeout(() => {
+      void saveSwapUi(walletLower, row);
+    }, 320);
+    return () => window.clearTimeout(t);
+  }, [
+    swapUiHydrated,
+    addr,
+    fromChainId,
+    toChainId,
+    fromToken?.address,
+    toToken?.address,
+    amountStr,
+  ]);
+
+  useEffect(() => {
+    if (fromChainId == null) return;
+    let cancel = false;
+    setSourceTokens(null);
+    setSourceTokensBusy(true);
+    setSourceTokensErr(null);
+    void (async () => {
+      try {
+        const res = await getTokens({
+          chains: [fromChainId],
+          chainTypes: [ChainType.EVM],
+          extended: true,
+          orderBy: 'volumeUSD24H',
+        });
+        if (cancel) return;
+        setSourceTokens(res.tokens?.[fromChainId] ?? []);
+      } catch (e) {
+        if (!cancel) {
+          setSourceTokensErr(summarizeApiError(e));
+          setSourceTokens([]);
+        }
+      } finally {
+        if (!cancel) setSourceTokensBusy(false);
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [fromChainId]);
+
+  const fromChoices = useMemo(() => {
+    if (!fromChainId) return [];
+    const bals = balancesRecord?.[fromChainId] ?? [];
+    const maps = buildBalanceMaps(bals);
+
+    if (sourceTokens?.length) {
+      const uniq = dedupeTokensForChain(sourceTokens, fromChainId);
+      const decorated = uniq.map(t => ({
+        token: t,
+        row: tokenToBalEntry(t, fromChainId, balanceForLiToken(t, maps)),
+      }));
+      decorated.sort((a, b) => compareFromPickerRows(a.token, a.row, b.token, b.row));
+      return decorated.map(d => d.row);
+    }
+    /* Catalog still loading or failed — at least show Li.FI-reported balances */
+    return bals.slice().sort(compareBalEntriesByBalanceThenSymbol);
+  }, [balancesRecord, fromChainId, sourceTokens]);
+
+  useEffect(() => {
+    const flipStale = flipPreferredFromBalRef.current;
+    if (flipStale && flipStale.chainId !== fromChainId) {
+      flipPreferredFromBalRef.current = null;
+    }
+    if (!fromChoices.length) {
+      if (
+        flipPreferredFromBalRef.current &&
+        flipPreferredFromBalRef.current.chainId === fromChainId
+      ) {
+        return;
+      }
+      setFromToken(null);
+      return;
+    }
+    const flipBal = flipPreferredFromBalRef.current;
+    if (flipBal && flipBal.chainId === fromChainId) {
+      flipPreferredFromBalRef.current = null;
+      const still = fromChoices.find(t => addressesMatchPayToken(t.address, flipBal.address));
+      setFromToken(still ?? flipBal);
+      return;
+    }
+    const restFrom = persistRestoreFromRef.current;
+    if (restFrom && restFrom.chainId === fromChainId) {
+      const still = fromChoices.find(t => addressesMatchPayToken(t.address, restFrom.address));
+      if (still) {
+        persistRestoreFromRef.current = null;
+        if (
+          !fromToken ||
+          !addressesMatchPayToken(fromToken.address, still.address) ||
+          still.amount !== fromToken.amount ||
+          still.logoURI !== fromToken.logoURI ||
+          still.priceUSD !== fromToken.priceUSD
+        ) {
+          setFromToken(still);
+        }
+        return;
+      }
+      persistRestoreFromRef.current = null;
+    }
+    if (!fromToken || fromToken.chainId !== fromChainId) {
+      const pref = fromChoices.find(t => safeBigIntAmount(t.amount) > 0n) ?? fromChoices[0]!;
+      setFromToken(pref);
+      return;
+    }
+    const still = fromChoices.find(t => addressesMatchPayToken(t.address, fromToken.address));
+    if (!still) {
+      const pref = fromChoices.find(t => safeBigIntAmount(t.amount) > 0n) ?? fromChoices[0]!;
+      setFromToken(pref);
+      return;
+    }
+    if (
+      still.amount !== fromToken.amount ||
+      still.logoURI !== fromToken.logoURI ||
+      still.priceUSD !== fromToken.priceUSD
+    ) {
+      setFromToken(still);
+    }
+  }, [fromChainId, fromChoices, fromToken]);
+
+  useEffect(() => {
+    if (toChainId == null) return;
+    let cancel = false;
+    setToToken(null);
+    setDestBusy(true);
+    setDestErr(null);
+    setDestTokens(null);
+    void (async () => {
+      try {
+        const res = await getTokens({
+          chains: [toChainId],
+          chainTypes: [ChainType.EVM],
+          extended: true,
+          orderBy: 'volumeUSD24H',
+        });
+        if (cancel) return;
+        const list = res.tokens?.[toChainId] ?? [];
+        setDestTokens(list);
+        if (!cancel && list.length > 0) {
+          const pref = flipPreferredToTokenRef.current;
+          let pick: Token | undefined;
+          if (pref) {
+            if (pref.chainId === toChainId) {
+              pick = list.find(t => addressesMatchPayToken(t.address, pref.address));
+            }
+            flipPreferredToTokenRef.current = null;
+          }
+          if (!pick) {
+            const pr = persistRestoreToRef.current;
+            if (pr && pr.chainId === toChainId) {
+              pick = list.find(t => addressesMatchPayToken(t.address, pr.address));
+            }
+            persistRestoreToRef.current = null;
+          }
+          if (!pick)
+            pick = list.find(t => ['USDC', 'ETH', 'DAI', 'USDT'].includes(t.symbol)) ?? list[0];
+          setToToken(pick!);
+        } else if (!cancel) {
+          flipPreferredToTokenRef.current = null;
+        }
+      } catch (e) {
+        if (!cancel) setDestErr(summarizeApiError(e));
+      } finally {
+        if (!cancel) setDestBusy(false);
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [toChainId]);
+
+  const filteredToTokens = useMemo(() => {
+    if (!destTokens?.length) return [];
+    const q = toSearch.trim().toLowerCase();
+    const pool = q
+      ? destTokens.filter(
+          t =>
+            t.symbol.toLowerCase().includes(q) ||
+            t.name.toLowerCase().includes(q) ||
+            t.address.toLowerCase().includes(q)
+        )
+      : destTokens;
+    const sorted = pool.slice().sort(compareTokensByPopularity);
+    return sorted.slice(0, q ? 180 : 80);
+  }, [destTokens, toSearch]);
+
+  const filteredFromTokensSheet = useMemo(() => {
+    const q = fromTokenSearch.trim().toLowerCase();
+    let list = fromChoices;
+    if (q) {
+      list = fromChoices.filter(
+        t =>
+          t.symbol.toLowerCase().includes(q) ||
+          t.name.toLowerCase().includes(q) ||
+          t.address.toLowerCase().includes(q)
+      );
+    } else {
+      list = fromChoices.filter(
+        t =>
+          safeBigIntAmount(t.amount) > 0n ||
+          (fromToken != null && addressesMatchPayToken(t.address, fromToken.address))
+      );
+    }
+    return list.slice(0, q ? 180 : 140);
+  }, [fromChoices, fromToken, fromTokenSearch]);
+
+  const filteredFromChainsSheet = useMemo(() => {
+    const q = fromNetSearch.trim().toLowerCase();
+    return chainChoices
+      .map(id => ({
+        id,
+        name: evmChains.find(c => c.id === id)?.name ?? `Chain ${id}`,
+        logo: evmChains.find(c => c.id === id)?.logoURI,
+      }))
+      .filter(c => !q || c.name.toLowerCase().includes(q) || String(c.id).includes(q));
+  }, [chainChoices, fromNetSearch, evmChains]);
+
+  const filteredToChainsSheet = useMemo(() => {
+    const q = toNetSearch.trim().toLowerCase();
+    const filtered = evmChains.filter(
+      c => !q || c.name.toLowerCase().includes(q) || String(c.id).includes(q)
+    );
+    return sortExtendedChains(filtered);
+  }, [evmChains, toNetSearch]);
+
+  const chainName = useCallback(
+    (id: number) => evmChains.find(c => c.id === id)?.name ?? `Chain ${id}`,
+    [evmChains]
+  );
+
+  const chainMeta = useMemo(() => {
+    const m = new Map<number, ExtendedChain>();
+    for (const c of evmChains) {
+      m.set(c.id, c);
+    }
+    return m;
+  }, [evmChains]);
+
+  const clearSwapStatusBanner = useCallback(() => {
+    setExecLog(null);
+    setExecTx(null);
+  }, []);
+
+  const flipExchangePair = useCallback(() => {
+    if (fromChainId == null || toChainId == null) return;
+    const prevFromChain = fromChainId;
+    const prevToChain = toChainId;
+    const prevFromBal = fromToken;
+    const prevToTok = toToken;
+
+    const newFromChain = prevToChain;
+    const newToChain = prevFromChain;
+    const sameChain = newFromChain === newToChain;
+
+    setQuote(null);
+    setQuoteErr(null);
+    setSwapSuccessCta(false);
+    clearSwapStatusBanner();
+    setAmountStr('');
+    setFromChainId(newFromChain);
+    setToChainId(newToChain);
+
+    if (!sameChain) {
+      if (prevToTok) {
+        const maps = buildBalanceMaps(balancesRecord?.[newFromChain] ?? []);
+        const bal = balanceForLiToken(prevToTok, maps);
+        flipPreferredFromBalRef.current = tokenToBalEntry(prevToTok, newFromChain, bal);
+      } else {
+        flipPreferredFromBalRef.current = null;
+      }
+
+      if (prevFromBal) {
+        flipPreferredToTokenRef.current = {
+          chainId: newToChain,
+          address: prevFromBal.address,
+        };
+      } else {
+        flipPreferredToTokenRef.current = null;
+      }
+      return;
+    }
+
+    /* Same chain: chain state does not change, so chain/token effects do not re-run — swap locally. */
+    flipPreferredFromBalRef.current = null;
+    flipPreferredToTokenRef.current = null;
+
+    const mapsFrom = buildBalanceMaps(balancesRecord?.[newFromChain] ?? []);
+
+    let nextFrom: BalEntry | null = null;
+    if (prevToTok) {
+      const bal = balanceForLiToken(prevToTok, mapsFrom);
+      nextFrom = tokenToBalEntry(prevToTok, newFromChain, bal);
+    }
+
+    let nextTo: Token | null = null;
+    if (prevFromBal) {
+      const row = { ...prevFromBal, chainId: newToChain };
+      const match = destTokens?.find(t => addressesMatchPayToken(t.address, row.address));
+      nextTo = match ?? balEntryToToken(row);
+    }
+
+    setFromToken(nextFrom);
+    setToToken(nextTo);
+  }, [
+    balancesRecord,
+    clearSwapStatusBanner,
+    destTokens,
+    fromChainId,
+    fromToken,
+    toChainId,
+    toToken,
+  ]);
+
+  const fromChainMeta = fromChainId != null ? chainMeta.get(fromChainId) : undefined;
+  const toChainMeta = toChainId != null ? chainMeta.get(toChainId) : undefined;
+
+  const maxAmount = () => {
+    if (!fromToken) return;
+    setSwapSuccessCta(false);
+    if (!execBusy) clearSwapStatusBanner();
+    try {
+      const v = formatUnits(BigInt(fromToken.amount), fromToken.decimals);
+      setAmountStr(v);
+    } catch {
+      setExecLog('Could not read balance for this token from LiFi.');
+    }
+  };
+
+  const applyAmountPercent = (pct: number) => {
+    if (!fromToken) return;
+    setSwapSuccessCta(false);
+    if (!execBusy) clearSwapStatusBanner();
+    try {
+      const bal = BigInt(fromToken.amount);
+      if (bal <= 0n) return;
+      const part = (bal * BigInt(pct)) / 100n;
+      if (part <= 0n) return;
+      setAmountStr(formatUnits(part, fromToken.decimals));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const amountUsdPreview = useMemo(() => {
+    if (!fromToken?.priceUSD) return null;
+    const parsed = parseHumanAmount(amountStr);
+    if (!parsed.ok) return null;
+    const n = Number(parsed.raw) * Number(fromToken.priceUSD);
+    if (!Number.isFinite(n)) return null;
+    return fmtNum(n, 2);
+  }, [amountStr, fromToken]);
+
+  const fmtBal = (t: BalEntry) => {
+    try {
+      return fmtNum(Number(formatUnits(BigInt(t.amount), t.decimals)));
+    } catch {
+      return '—';
+    }
+  };
+
+  const fmtBalUsd = (t: BalEntry) => {
+    try {
+      const v = Number(formatUnits(BigInt(t.amount), t.decimals)) * Number(t.priceUSD || 0);
+      return Number.isFinite(v) ? fmtNum(v, 2) : '—';
+    } catch {
+      return '—';
+    }
+  };
+
+  const fetchQuoteLiFi = useCallback(async (): Promise<LiFiStep> => {
+    if (!addr || !fromToken || !toToken || fromChainId == null || toChainId == null) {
+      throw new Error('Select chains and tokens first.');
+    }
+    const parsed = parseHumanAmount(amountStr);
+    if (!parsed.ok) {
+      throw new Error(parsed.reason);
+    }
+    let wei: bigint;
+    try {
+      wei = parseUnits(parsed.raw, fromToken.decimals);
+    } catch {
+      throw new Error('Decimals or amount out of range.');
+    }
+    const q = await getQuote({
+      fromChain: fromChainId,
+      toChain: toChainId,
+      fromToken: tokenKeyForQuote(fromToken.address),
+      toToken: tokenKeyForQuote(toToken.address),
+      fromAmount: wei.toString(),
+      fromAddress: getAddress(addr),
+      toAddress: getAddress(addr),
+      slippage: slippageRatio,
+    });
+    if (!q.transactionRequest) {
+      throw new Error(
+        'LiFi returned a quote without ready transaction data. Try another pair or amount.'
+      );
+    }
+    return q;
+  }, [addr, amountStr, fromChainId, fromToken, slippageRatio, toChainId, toToken]);
+
+  const requestQuote = async () => {
+    setSwapSuccessCta(false);
+    clearSwapStatusBanner();
+    setQuote(null);
+    setQuoteErr(null);
+    setQuoteBusy(true);
+    try {
+      const q = await fetchQuoteLiFi();
+      setQuote(q);
+      setQuoteErr(null);
+    } catch (e) {
+      setQuoteErr(summarizeApiError(e));
+    } finally {
+      setQuoteBusy(false);
+    }
+  };
+
+  const pollCrossChain = (h: string, from: number, to: number, tool: string, destToken: Token) => {
+    if (statusTimer.current) window.clearInterval(statusTimer.current);
+    statusTimer.current = window.setInterval(() => {
+      void (async () => {
+        try {
+          const st = await getStatus({
+            txHash: h,
+            fromChain: String(from),
+            toChain: String(to),
+            bridge: tool,
+          });
+          setExecLog(`Cross-chain status: ${st.status}${st.substatus ? ` (${st.substatus})` : ''}`);
+          if (st.status === 'DONE' || st.status === 'FAILED') {
+            if (statusTimer.current) window.clearInterval(statusTimer.current);
+            statusTimer.current = null;
+            if (st.status === 'DONE') {
+              void commitRpcSnapshotForChains([{ chainId: to, extras: [destToken] }]);
+            }
+            scheduleStaggeredBalanceReload();
+            setAmountStr('');
+            setQuote(null);
+            setQuoteErr(null);
+            const hex = h as `0x${string}`;
+            if (st.status === 'DONE') {
+              setSwapSuccessCta(true);
+              setExecLog(`Done (cross-chain). ${h}`);
+              setExecTx({ chainId: from, hash: hex });
+            } else {
+              setExecLog(`Bridge failed${st.substatus ? ` (${st.substatus})` : ''}. ${h}`);
+              setExecTx({ chainId: from, hash: hex });
+            }
+          }
+        } catch (e) {
+          setExecLog(`Status check failed: ${summarizeApiError(e)}`);
+        }
+      })();
+    }, 5000);
+  };
+
+  useEffect(
+    () => () => {
+      if (statusTimer.current) window.clearInterval(statusTimer.current);
+      clearBalanceRetryTimers();
+    },
+    [clearBalanceRetryTimers]
+  );
+
+  const execute = async () => {
+    setSwapSuccessCta(false);
+    setExecLog(null);
+    setExecTx(null);
+    if (!addr) {
+      setExecLog('Unlock your wallet first.');
+      return;
+    }
+    setExecBusy(true);
+    try {
+      let step = quote;
+      if (!step?.transactionRequest) {
+        try {
+          setExecLog('Fetching a fresh quote…');
+          setExecTx(null);
+          step = await fetchQuoteLiFi();
+          setQuote(step);
+        } catch (e) {
+          setExecLog(summarizeApiError(e));
+          setExecTx(null);
+          return;
+        }
+      }
+
+      const est = step.estimate;
+      if (!step.transactionRequest || !est) {
+        setExecLog('Nothing to execute — quote has no execution payload.');
+        setExecTx(null);
+        return;
+      }
+      if (!fromToken) {
+        setExecLog('Select a from token first.');
+        setExecTx(null);
+        return;
+      }
+
+      const fromC = step.action.fromChainId;
+      const spend = BigInt(step.action.fromAmount);
+      const maxBal = BigInt(fromToken.amount || '0');
+      if (spend > maxBal) {
+        setExecLog(
+          'Amount exceeds LiFi-reported balance. Fund the wallet or lower the amount before swapping.'
+        );
+        setExecTx(null);
+        return;
+      }
+      const approvalAddr = est.approvalAddress;
+      const tokenAddr = step.action.fromToken.address;
+
+      if (!est.skipApproval && approvalAddr && !isNativeToken(tokenAddr)) {
+        setExecLog('Checking token allowance…');
+        setExecTx(null);
+        const ah = await ensureErc20Allowance({
+          chainId: fromC,
+          tokenAddress: tokenAddr,
+          spender: approvalAddr,
+          minAmount: spend,
+        });
+        if (ah) {
+          setExecLog(`Approval sent (${ah.slice(0, 10)}…), waiting for confirmation…`);
+          setExecTx({ chainId: fromC, hash: ah as `0x${string}` });
+          const recApprove = await waitForChainReceipt(ah, fromC);
+          if (recApprove.status !== 'success') {
+            setExecLog('Approval transaction reverted.');
+            setExecTx(null);
+            return;
+          }
+          setExecLog('Re-fetching quote after approval…');
+          setExecTx(null);
+          try {
+            step = await fetchQuoteLiFi();
+            setQuote(step);
+          } catch (e) {
+            setExecLog(summarizeApiError(e));
+            setExecTx(null);
+            return;
+          }
+          if (!step.transactionRequest) {
+            setExecLog('Re-quote after approval did not return transaction data.');
+            setExecTx(null);
+            return;
+          }
+        }
+      }
+
+      const tr = step.transactionRequest;
+      setExecLog('Executing swap…');
+      setExecTx(null);
+      const txHash = await sendTransactionRequest(fromC, tr);
+      const hex = txHash as `0x${string}`;
+      setExecLog(`Submitted: ${txHash}`);
+      setExecTx({ chainId: fromC, hash: hex });
+      const rec = await waitForChainReceipt(txHash, fromC);
+      if (rec.status !== 'success') {
+        setExecLog(`Transaction reverted: ${txHash}`);
+        setExecTx({ chainId: fromC, hash: hex });
+        return;
+      }
+      if (fromC !== step.action.toChainId) {
+        pollCrossChain(txHash, fromC, step.action.toChainId, step.tool, step.action.toToken);
+        void commitRpcSnapshotForChains([{ chainId: fromC, extras: [step.action.fromToken] }]);
+      } else {
+        setAmountStr('');
+        setQuote(null);
+        setQuoteErr(null);
+        setSwapSuccessCta(true);
+        setExecLog(`Done (same-chain). ${txHash}`);
+        setExecTx({ chainId: fromC, hash: hex });
+        void commitRpcSnapshotForChains([
+          { chainId: fromC, extras: [step.action.fromToken, step.action.toToken] },
+        ]);
+      }
+      scheduleStaggeredBalanceReload();
+      void (async () => {
+        try {
+          const next = await appendSwapToHistory({
+            wallet: getAddress(addr),
+            txHash: hex,
+            txChainId: fromC,
+            fromChainId: step.action.fromChainId,
+            toChainId: step.action.toChainId,
+            fromSymbol: step.action.fromToken.symbol,
+            toSymbol: step.action.toToken.symbol,
+            crossChain: fromC !== step.action.toChainId,
+          });
+          setSwapHistory(next);
+        } catch {
+          /* ignore */
+        }
+      })();
+    } catch (e) {
+      setExecLog(summarizeApiError(e));
+      setExecTx(null);
+    } finally {
+      setExecBusy(false);
+    }
+  };
+
+  const closeSheet = useCallback(() => {
+    setSheet(null);
+    setFromNetSearch('');
+    setToNetSearch('');
+    setFromTokenSearch('');
+  }, []);
+
+  useEffect(() => {
+    closeSheet();
+  }, [walletTab, closeSheet]);
+
+  if (!addr) {
+    return <p className="panel error">No account</p>;
+  }
+
+  const outPreview =
+    quote?.estimate?.toAmount && quote.action.toToken
+      ? formatUnits(BigInt(quote.estimate.toAmount), quote.action.toToken.decimals)
+      : null;
+  const settingsBtn = (
+    <button
+      type="button"
+      className="jumpa-icon-head"
+      onClick={onOpenSettings}
+      aria-label="Settings"
+    >
+      <svg
+        width={20}
+        height={20}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+      >
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+      </svg>
+    </button>
+  );
+
+  const sheetSearch = (placeholder: string, value: string, set: (s: string) => void) => (
+    <div className="jumpa-search-field">
+      <svg
+        className="jumpa-search-field__icon"
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        aria-hidden
+      >
+        <circle cx="11" cy="11" r="8" />
+        <path d="m21 21-4.35-4.35" />
+      </svg>
+      <input
+        type="search"
+        className="jumpa-search-field__input"
+        placeholder={placeholder}
+        value={value}
+        onChange={e => set(e.target.value)}
+        autoComplete="off"
+        spellCheck={false}
+      />
+    </div>
+  );
+
+  const walletTitle = walletTab === 'swap' ? 'Exchange' : walletTab === 'defi' ? 'DeFi' : 'History';
+
+  useEffect(() => {
+    if (embedded) setWalletTab('swap');
+  }, [embedded]);
+
+  const body = (
+    <div className={embedded ? 'jumpa-body jumpa-body--compact' : 'screen-body jumpa-body jumpa-body--compact'}>
+        {(embedded || walletTab === 'swap') ? (
+          <>
+            <p className="jumpa-li-fi-hint">Powered by Li.Fi</p>
+
+            <div className="jumpa-card jumpa-exchange-card">
+              <div className="jumpa-pair-row">
+                <button
+                  type="button"
+                  className="jumpa-pair-cell"
+                  onClick={() => {
+                    setFromTokenSearch('');
+                    setSheet('fromToken');
+                  }}
+                  disabled={balancesBusy}
+                >
+                  <JumpaTokenWithBadge
+                    tokenLogoURI={fromToken?.logoURI}
+                    chainLogoURI={fromChainMeta?.logoURI}
+                    size={40}
+                    symbol={fromToken?.symbol ?? '—'}
+                    subline={fromChainId != null ? chainName(fromChainId) : ' '}
+                    empty={!fromToken}
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  className="jumpa-pair-flip"
+                  aria-label="Swap from and to tokens"
+                  onClick={() => flipExchangePair()}
+                  disabled={balancesBusy || fromChainId == null || toChainId == null}
+                >
+                  <span className="jumpa-pair-mid-circle">
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <path d="M4 9h11.5M15.5 9 19 5.5M15.5 9 19 12.5" />
+                      <path d="M20 15H8.5M8.5 15 5 18.5M8.5 15 5 11.5" />
+                    </svg>
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  className="jumpa-pair-cell"
+                  onClick={() => {
+                    setToSearch('');
+                    setSheet('toToken');
+                  }}
+                  disabled={destBusy}
+                >
+                  <JumpaTokenWithBadge
+                    tokenLogoURI={toToken?.logoURI}
+                    chainLogoURI={toChainMeta?.logoURI}
+                    size={40}
+                    symbol={toToken?.symbol ?? '—'}
+                    subline={toChainId != null ? chainName(toChainId) : ' '}
+                    empty={!toToken}
+                  />
+                </button>
+              </div>
+
+              <div className="jumpa-send-block">
+                <span className="jumpa-label">From</span>
+                <input
+                  className="jumpa-amount-massive"
+                  value={amountStr}
+                  disabled={execBusy}
+                  onChange={e => {
+                    setSwapSuccessCta(false);
+                    if (!execBusy) clearSwapStatusBanner();
+                    setAmountStr(e.target.value);
+                  }}
+                  placeholder="0"
+                  inputMode="decimal"
+                />
+                <div className="jumpa-amount-meta">
+                  <span className="jumpa-amount-usd">
+                    {amountUsdPreview != null ? `~$${amountUsdPreview}` : '—'}
+                  </span>
+                </div>
+                <div className="jumpa-pct-row">
+                  {([25, 50, 75] as const).map(pct => (
+                    <button
+                      key={pct}
+                      type="button"
+                      className="jumpa-pct"
+                      disabled={!fromToken || balancesBusy || execBusy}
+                      onClick={() => applyAmountPercent(pct)}
+                    >
+                      {pct}%
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className="jumpa-pct jumpa-pct--max"
+                    disabled={!fromToken || balancesBusy || execBusy}
+                    onClick={maxAmount}
+                  >
+                    MAX
+                  </button>
+                </div>
+              </div>
+
+              <div className="jumpa-actions">
+                {swapSuccessCta && !quote && !quoteBusy ? (
+                  <button
+                    type="button"
+                    className="primary jumpa-success-cta"
+                    tabIndex={-1}
+                    aria-disabled="true"
+                    aria-live="polite"
+                    onClick={e => e.preventDefault()}
+                  >
+                    Success
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="primary"
+                    disabled={quoteBusy || balancesBusy}
+                    onClick={() => void requestQuote()}
+                  >
+                    {quoteBusy ? 'Getting quote…' : 'Get quote'}
+                  </button>
+                )}
+              </div>
+
+              {balancesErr && <p className="error">Balances: {balancesErr}</p>}
+              {quoteErr && <p className="error">{quoteErr}</p>}
+              {quote && (
+                <div className="jumpa-quote jumpa-quote--compact">
+                  <div className="jumpa-quote-assets">
+                    <div className="jumpa-quote-chip">
+                      <JumpaLiFiIcon
+                        logoURI={quote.action.fromToken.logoURI}
+                        label={quote.action.fromToken.symbol}
+                        size={28}
+                        rounded
+                      />
+                      <span>
+                        <strong>{quote.action.fromToken.symbol}</strong>
+                      </span>
+                    </div>
+                    <span className="jumpa-quote-arrow" aria-hidden>
+                      →
+                    </span>
+                    <div className="jumpa-quote-chip">
+                      <JumpaLiFiIcon
+                        logoURI={quote.action.toToken.logoURI}
+                        label={quote.action.toToken.symbol}
+                        size={28}
+                        rounded
+                      />
+                      <span>
+                        <strong>{quote.action.toToken.symbol}</strong>
+                      </span>
+                    </div>
+                  </div>
+                  <div className="muted jumpa-quote-route">
+                    Via <strong>{quote.tool}</strong>
+                    {quote.toolDetails?.name ? ` · ${quote.toolDetails.name}` : ''}
+                  </div>
+                  {outPreview && quote.action.toToken && (
+                    <p className="jumpa-est">
+                      Est.{' '}
+                      <strong>
+                        {fmtNum(Number(outPreview))} {quote.action.toToken.symbol}
+                      </strong>
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    className="primary jumpa-swap-btn"
+                    disabled={execBusy || !quote.transactionRequest || !!quoteErr}
+                    onClick={() => void execute()}
+                  >
+                    {execBusy ? 'Working…' : 'Swap'}
+                  </button>
+                </div>
+              )}
+              {execLog && (
+                <div className="muted">
+                  <SwapExecLog log={execLog} tx={execTx} chainById={chainMeta} />
+                </div>
+              )}
+            </div>
+
+            <div className="jumpa-footer jumpa-footer--tight">
+              <button
+                type="button"
+                className="ghost"
+                disabled={balancesBusy}
+                onClick={() => {
+                  snapshotActiveFromChain();
+                  void reloadBalances();
+                }}
+              >
+                Refresh
+              </button>
+            </div>
+          </>
+        ) : walletTab === 'defi' ? (
+          <DefiYieldPanel />
+        ) : (
+          <div className="jumpa-history-tab">
+            {swapHistory.length === 0 ? (
+              <p className="jumpa-history-tab__empty muted">No activity recorded yet.</p>
+            ) : (
+              <ul className="jumpa-history-tab__list jumpa-swap-history__list">
+                {swapHistory.map(e => {
+                  const url = transactionExplorerUrl(
+                    e.txChainId,
+                    e.txHash,
+                    chainMeta.get(e.txChainId)
+                  );
+                  const sub =
+                    (e.crossChain ? 'Bridge' : 'Swap') +
+                    ' · ' +
+                    formatSwapHistoryRelTime(e.at) +
+                    (url ? ' · View tx' : '');
+                  const inner = (
+                    <>
+                      <span className="jumpa-swap-history__pair">
+                        {e.fromSymbol} → {e.toSymbol}
+                      </span>
+                      <span className="jumpa-swap-history__sub muted">{sub}</span>
+                    </>
+                  );
+                  return (
+                    <li key={e.id}>
+                      {url ? (
+                        <a
+                          className="jumpa-swap-history__row"
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {inner}
+                        </a>
+                      ) : (
+                        <span className="jumpa-swap-history__row jumpa-swap-history__row--dead">
+                          {inner}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {!embedded ? (
+          <p className="muted mono jumpa-address" title={addr}>
+            {addr}
+          </p>
+        ) : null}
+      </div>
+  );
+
+  const sheets = walletTab === 'swap' && sheet ? (
+        <div className="jumpa-sheet-mount">
+          <button
+            type="button"
+            className="jumpa-sheet-backdrop"
+            aria-label="Dismiss"
+            onClick={closeSheet}
+          />
+          <div
+            className="jumpa-sheet-panel"
+            role="dialog"
+            aria-modal="true"
+            onClick={e => e.stopPropagation()}
+          >
+            {sheet === 'fromNet' && (
+              <>
+                <div className="jumpa-sheet-head">
+                  <button
+                    type="button"
+                    className="jumpa-sheet-back"
+                    onClick={() => setSheet('fromToken')}
+                    aria-label="Back"
+                  >
+                    ‹
+                  </button>
+                  <h2 className="jumpa-sheet-h2">From network</h2>
+                </div>
+                {sheetSearch('Search network', fromNetSearch, setFromNetSearch)}
+                <ul className="jumpa-sheet-list">
+                  {filteredFromChainsSheet.map(c => (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        className={
+                          'jumpa-sheet-row' + (c.id === fromChainId ? ' jumpa-sheet-row--on' : '')
+                        }
+                        onClick={() => {
+                          setSwapSuccessCta(false);
+                          clearSwapStatusBanner();
+                          setQuote(null);
+                          setQuoteErr(null);
+                          setFromChainId(c.id);
+                          setToChainId(c.id);
+                          setSheet('fromToken');
+                        }}
+                      >
+                        <JumpaLiFiIcon logoURI={c.logo} label={c.name} size={34} rounded />
+                        <span className="jumpa-sheet-row-text">{c.name}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+
+            {sheet === 'fromToken' && (
+              <>
+                <div className="jumpa-sheet-head">
+                  <button
+                    type="button"
+                    className="jumpa-sheet-back"
+                    onClick={closeSheet}
+                    aria-label="Back"
+                  >
+                    ‹
+                  </button>
+                  <h2 className="jumpa-sheet-h2">Exchange from</h2>
+                </div>
+                <button
+                  type="button"
+                  className="jumpa-sheet-net-pill jumpa-sheet-net-pill--brand"
+                  onClick={() => setSheet('fromNet')}
+                  disabled={!chainChoices.length}
+                >
+                  <JumpaLiFiIcon
+                    logoURI={fromChainMeta?.logoURI}
+                    label={fromChainId != null ? chainName(fromChainId) : ' '}
+                    size={28}
+                    rounded
+                  />
+                  <span className="jumpa-sheet-net-pill-stack">
+                    <span className="jumpa-sheet-net-pill-muted">Network</span>
+                    <span className="jumpa-sheet-net-pill-name">
+                      {fromChainId != null ? chainName(fromChainId) : '…'}
+                    </span>
+                  </span>
+                  <span className="jumpa-sheet-net-pill-chev" aria-hidden>
+                    ›
+                  </span>
+                </button>
+                {sheetSearch('Search by token or address', fromTokenSearch, setFromTokenSearch)}
+                <ul className="jumpa-sheet-list">
+                  {sourceTokensBusy ? (
+                    <li className="jumpa-sheet-empty">Loading tokens…</li>
+                  ) : sourceTokensErr && !fromChoices.length ? (
+                    <li className="jumpa-sheet-empty">{sourceTokensErr}</li>
+                  ) : !filteredFromTokensSheet.length ? (
+                    <li className="jumpa-sheet-empty">
+                      {fromTokenSearch.trim()
+                        ? 'No tokens match search.'
+                        : 'No token list for this network yet. Pull to refresh balances or try search.'}
+                    </li>
+                  ) : (
+                    filteredFromTokensSheet.map(t => (
+                      <li key={t.address + t.symbol + String(t.chainId)}>
+                        <button
+                          type="button"
+                          className={
+                            'jumpa-sheet-row jumpa-sheet-row--token' +
+                            (fromToken && addressesMatchPayToken(fromToken.address, t.address)
+                              ? ' jumpa-sheet-row--on'
+                              : '')
+                          }
+                          onClick={() => {
+                            setSwapSuccessCta(false);
+                            clearSwapStatusBanner();
+                            const tokChanged =
+                              !fromToken || !addressesMatchPayToken(fromToken.address, t.address);
+                            if (tokChanged) {
+                              setQuote(null);
+                              setQuoteErr(null);
+                            }
+                            setFromToken(t);
+                            closeSheet();
+                          }}
+                        >
+                          <JumpaTokenWithBadge
+                            tokenLogoURI={t.logoURI}
+                            chainLogoURI={fromChainMeta?.logoURI}
+                            size={36}
+                            symbol={t.symbol}
+                            subline={t.name.length > 42 ? `${t.name.slice(0, 40)}…` : t.name}
+                          />
+                          <div className="jumpa-sheet-row-bal">
+                            <span className="jumpa-sheet-row-amt">{fmtBal(t)}</span>
+                            <span className="jumpa-sheet-row-usd">${fmtBalUsd(t)}</span>
+                          </div>
+                        </button>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </>
+            )}
+
+            {sheet === 'toNet' && (
+              <>
+                <div className="jumpa-sheet-head">
+                  <button
+                    type="button"
+                    className="jumpa-sheet-back"
+                    onClick={() => setSheet('toToken')}
+                    aria-label="Back"
+                  >
+                    ‹
+                  </button>
+                  <h2 className="jumpa-sheet-h2">To network</h2>
+                </div>
+                {sheetSearch('Search network', toNetSearch, setToNetSearch)}
+                <ul className="jumpa-sheet-list">
+                  {filteredToChainsSheet.map(c => (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        className={
+                          'jumpa-sheet-row' + (c.id === toChainId ? ' jumpa-sheet-row--on' : '')
+                        }
+                        onClick={() => {
+                          setSwapSuccessCta(false);
+                          clearSwapStatusBanner();
+                          if (c.id !== toChainId) {
+                            setQuote(null);
+                            setQuoteErr(null);
+                          }
+                          setToChainId(c.id);
+                          setSheet('toToken');
+                        }}
+                      >
+                        <JumpaLiFiIcon logoURI={c.logoURI} label={c.name} size={34} rounded />
+                        <span className="jumpa-sheet-row-text">{c.name}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+
+            {sheet === 'toToken' && (
+              <>
+                <div className="jumpa-sheet-head">
+                  <button
+                    type="button"
+                    className="jumpa-sheet-back"
+                    onClick={closeSheet}
+                    aria-label="Back"
+                  >
+                    ‹
+                  </button>
+                  <h2 className="jumpa-sheet-h2">You receive</h2>
+                </div>
+                <button
+                  type="button"
+                  className="jumpa-sheet-net-pill jumpa-sheet-net-pill--brand"
+                  onClick={() => setSheet('toNet')}
+                  disabled={!evmChains.length}
+                >
+                  <JumpaLiFiIcon
+                    logoURI={toChainMeta?.logoURI}
+                    label={toChainId != null ? chainName(toChainId) : ' '}
+                    size={28}
+                    rounded
+                  />
+                  <span className="jumpa-sheet-net-pill-stack">
+                    <span className="jumpa-sheet-net-pill-muted">Network</span>
+                    <span className="jumpa-sheet-net-pill-name">
+                      {toChainId != null ? chainName(toChainId) : '…'}
+                    </span>
+                  </span>
+                  <span className="jumpa-sheet-net-pill-chev" aria-hidden>
+                    ›
+                  </span>
+                </button>
+                {sheetSearch('Search token or address', toSearch, setToSearch)}
+                <ul className="jumpa-sheet-list">
+                  {!destTokens?.length && destBusy ? (
+                    <li className="jumpa-sheet-empty">Loading tokens…</li>
+                  ) : destErr ? (
+                    <li className="jumpa-sheet-empty">{destErr}</li>
+                  ) : !filteredToTokens.length ? (
+                    <li className="jumpa-sheet-empty">No match</li>
+                  ) : (
+                    filteredToTokens.map(t => (
+                      <li key={t.address + t.symbol}>
+                        <button
+                          type="button"
+                          className={
+                            'jumpa-sheet-row jumpa-sheet-row--token' +
+                            (toToken && addressesMatchPayToken(toToken.address, t.address)
+                              ? ' jumpa-sheet-row--on'
+                              : '')
+                          }
+                          onClick={() => {
+                            setSwapSuccessCta(false);
+                            clearSwapStatusBanner();
+                            const tokChanged =
+                              !toToken || !addressesMatchPayToken(toToken.address, t.address);
+                            if (tokChanged) {
+                              setQuote(null);
+                              setQuoteErr(null);
+                            }
+                            setToToken(t);
+                            closeSheet();
+                          }}
+                        >
+                          <JumpaTokenWithBadge
+                            tokenLogoURI={t.logoURI}
+                            chainLogoURI={toChainMeta?.logoURI}
+                            size={36}
+                            symbol={t.symbol}
+                            subline={t.name.length > 42 ? `${t.name.slice(0, 40)}…` : t.name}
+                          />
+                        </button>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </>
+            )}
+          </div>
+        </div>
+      ) : null;
+
+  if (embedded) {
+    return (
+      <div className="jumpa jumpa--swap jumpa--embedded">
+        {body}
+        {sheets}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`wallet-shell jumpa jumpa--swap${walletTab === 'swap' ? '' : ' jumpa--wallet-subtab'}`}
+    >
+      <ScreenHeader title={walletTitle} trailing={settingsBtn} />
+
+      <nav className="jumpa-wallet-tabs" aria-label="Wallet sections">
+        {(['swap', 'defi', 'history'] as const).map(t => (
+          <button
+            key={t}
+            type="button"
+            className={`jumpa-wallet-tabs__btn${walletTab === t ? ' jumpa-wallet-tabs__btn--on' : ''}`}
+            aria-current={walletTab === t ? 'page' : undefined}
+            onClick={() => setWalletTab(t)}
+          >
+            {t === 'swap' ? 'SWAP' : t === 'defi' ? 'DEFI' : 'HISTORY'}
+          </button>
+        ))}
+      </nav>
+
+      {body}
+      {sheets}
+    </div>
+  );
+}

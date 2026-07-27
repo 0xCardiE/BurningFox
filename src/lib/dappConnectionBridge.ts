@@ -1,0 +1,50 @@
+export type DappTabInfo = {
+  tabId: number;
+  url: string;
+  title: string;
+  origin: string;
+  hostname: string;
+  favIconUrl?: string;
+};
+
+export type DappConnectionStatus = {
+  ok: boolean;
+  tab: DappTabInfo | null;
+  connected: boolean;
+  canConnect: boolean;
+  reason?: string;
+};
+
+export async function fetchDappConnectionStatus(): Promise<DappConnectionStatus> {
+  try {
+    const res = (await chrome.runtime.sendMessage({ type: 'GET_DAPP_CONNECTION' })) as DappConnectionStatus;
+    if (res?.ok) return res;
+  } catch {
+    /* ignore */
+  }
+  return { ok: false, tab: null, connected: false, canConnect: false, reason: 'Extension unavailable' };
+}
+
+export async function connectActiveTab(): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = (await chrome.runtime.sendMessage({ type: 'CONNECT_ACTIVE_TAB' })) as {
+      ok?: boolean;
+      error?: string;
+    };
+    return { ok: res?.ok === true, error: res?.error };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export async function disconnectActiveTab(): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = (await chrome.runtime.sendMessage({ type: 'DISCONNECT_ACTIVE_TAB' })) as {
+      ok?: boolean;
+      error?: string;
+    };
+    return { ok: res?.ok === true, error: res?.error };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
