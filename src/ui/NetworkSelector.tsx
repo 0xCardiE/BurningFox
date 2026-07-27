@@ -5,13 +5,14 @@ import {
   type AppSettings,
 } from '../lib/storageState';
 import {
-  CHAIN_CATALOG,
+  allChains,
   chainById,
   chainsByKind,
   type ChainDefinition,
   type ChainKind,
 } from '../lib/chainCatalog';
 import { chainLogoUri } from '../lib/chainLogo';
+import { notifyConnectedTabsChainChanged } from '../lib/chainSyncBridge';
 import { allRpcOptionsFor } from '../lib/chainRpcRegistry';
 import { describeError } from '../lib/utils';
 import { BfoxSelect, BfoxSegmented, type BfoxSelectGroup } from './BfoxSelect';
@@ -86,7 +87,10 @@ export function NetworkSelector({ settings, onSaved }: Props) {
     return rpcOptions[0] ?? '';
   }, [activeChainId, settings.preferredRpcByChain, rpcOptions]);
 
-  const chainGroupsMemo = useMemo(() => chainGroups(netFilter), [netFilter]);
+  const chainGroupsMemo = useMemo(
+    () => chainGroups(netFilter),
+    [netFilter, settings.customChains],
+  );
 
   const rpcGroups = useMemo<BfoxSelectGroup[]>(
     () => [
@@ -108,6 +112,7 @@ export function NetworkSelector({ settings, onSaved }: Props) {
     setErr(null);
     try {
       await patchSettings({ activeChainId: nextId });
+      await notifyConnectedTabsChainChanged(nextId);
       onSaved();
     } catch (e) {
       setErr(describeError(e));
@@ -141,7 +146,7 @@ export function NetworkSelector({ settings, onSaved }: Props) {
     await onChainChange(defaultChainForKind(next));
   }
 
-  const activeInCatalog = CHAIN_CATALOG.some(c => c.chainId === activeChainId);
+  const activeInCatalog = allChains().some(c => c.chainId === activeChainId);
 
   return (
     <div className="bfox-net-select">

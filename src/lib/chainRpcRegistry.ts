@@ -1,10 +1,12 @@
 import type { ExtendedChain } from '@lifi/types';
-import { CHAIN_CATALOG, MAX_RPC_OPTIONS } from './chainCatalog';
+import { CHAIN_CATALOG, MAX_RPC_OPTIONS, type ChainDefinition } from './chainCatalog';
 import { CHAIN_RPC_FALLBACK } from './constants';
 
 const catalogRpcs: Record<number, string[]> = Object.fromEntries(
   CHAIN_CATALOG.map(c => [c.chainId, [...c.rpcUrls]]),
 );
+
+const customChainRpcs: Record<number, string[]> = {};
 
 const extraRpcsByChainId: Record<number, string[]> = {};
 
@@ -18,6 +20,17 @@ export function setPreferredRpcMap(map: Record<number, string>): void {
 
 export function setCustomRpcMap(map: Record<number, string[]>): void {
   customRpcByChainId = { ...map };
+}
+
+/** Sync built-in RPC lists from user-added chain definitions. */
+export function setCustomChainRpcCatalog(chains: ChainDefinition[]): void {
+  for (const key of Object.keys(customChainRpcs)) {
+    delete customChainRpcs[Number(key)];
+  }
+  for (const c of chains) {
+    if (!c?.rpcUrls?.length) continue;
+    customChainRpcs[c.chainId] = [...c.rpcUrls];
+  }
 }
 
 export function preferredRpcFor(chainId: number): string | undefined {
@@ -57,7 +70,7 @@ export function mergeLifiChainRpcs(chains: ExtendedChain[]): void {
 export function rpcUrlsFor(chainId: number): string[] {
   const preferred = preferredRpcFor(chainId);
   const fb = CHAIN_RPC_FALLBACK[chainId] ?? [];
-  const catalog = catalogRpcs[chainId] ?? [];
+  const catalog = catalogRpcs[chainId] ?? customChainRpcs[chainId] ?? [];
   const custom = customRpcByChainId[chainId] ?? [];
   const extra = extraRpcsByChainId[chainId] ?? [];
   const merged: string[] = [];

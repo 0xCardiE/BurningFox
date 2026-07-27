@@ -3230,3 +3230,242 @@ button.bfox-dd__option--on:hover {
   display: none;
 }
 
+/* Settings → Networks entry */
+.bfox-settings-link-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+}
+
+.bfox-settings-link-card strong {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+/* Networks manage screen */
+.bfox-networks {
+  padding-bottom: 20px;
+}
+
+.bfox-networks__lead {
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.bfox-networks__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.bfox-networks__filters {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-muted, color-mix(in srgb, var(--border) 45%, transparent));
+}
+
+.bfox-networks__chip {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.bfox-networks__chip--on {
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.bfox-networks__add-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+
+.bfox-networks__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bfox-networks__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.bfox-networks__row:hover {
+  border-color: color-mix(in srgb, var(--purple) 35%, var(--border));
+  background: var(--accent-soft);
+}
+
+.bfox-networks__row--active {
+  border-color: color-mix(in srgb, var(--purple) 45%, var(--border));
+  background: var(--accent-soft);
+}
+
+.bfox-networks__row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.bfox-networks__row-name {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.bfox-networks__row-sub {
+  font-size: 11px;
+}
+
+.bfox-networks__chev {
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0.55;
+}
+
+.bfox-networks__badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--border) 70%, transparent);
+  color: var(--text-muted);
+}
+
+.bfox-networks__badge--on {
+  background: var(--accent-soft-2, var(--accent-soft));
+  color: var(--purple);
+}
+
+.bfox-networks__detail-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.bfox-networks__detail-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.bfox-networks__active-note {
+  margin: 0 0 14px;
+  font-size: 12px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  color: var(--purple);
+}
+
+.bfox-networks__section-title {
+  margin: 4px 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.bfox-networks__rpc-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bfox-networks__rpc-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.bfox-networks__rpc-pick {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: none;
+  min-width: 0;
+}
+
+.bfox-networks__rpc-pick:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--purple) 35%, var(--border));
+}
+
+.bfox-networks__rpc-pick--on {
+  border-color: color-mix(in srgb, var(--purple) 50%, var(--border));
+  background: var(--accent-soft);
+}
+
+.bfox-networks__rpc-label {
+  font-size: 12px;
+  font-weight: 560;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.bfox-networks__rpc-remove {
+  flex: 0 0 auto;
+  width: 36px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+

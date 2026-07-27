@@ -6,12 +6,17 @@ import {
   connectOrigin,
   disconnectOrigin,
   faviconForTab,
+  getConnectedOrigins,
   isOriginConnected,
   originFromUrl,
   queryActiveBrowserTab,
 } from './lib/dappConnections';
 import { addressFromPrivateKey } from './lib/backgroundSign';
-import { handleProviderRpc, executeSignRequest } from './lib/providerRpc';
+import {
+  handleProviderRpc,
+  executeSignRequest,
+  type ProviderRpcResult,
+} from './lib/providerRpc';
 import {
   listPendingApprovals,
   rejectPendingApproval,
@@ -109,6 +114,31 @@ async function emitToTab(
   }
 }
 
+/** Push chainChanged to every tab whose origin is connected (and optionally one extra tab). */
+async function broadcastChainChanged(
+  chainId: number,
+  extraTabId?: number,
+): Promise<void> {
+  const hex = toHexChainId(chainId);
+  const origins = await getConnectedOrigins();
+  const seen = new Set<number>();
+  try {
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+      if (tab.id == null) continue;
+      const origin = originFromUrl(tab.url);
+      if (!origin || !origins.has(origin)) continue;
+      seen.add(tab.id);
+      await emitToTab(tab.id, { type: 'chainChanged', chainId: hex });
+    }
+  } catch {
+    /* ignore */
+  }
+  if (extraTabId != null && !seen.has(extraTabId)) {
+    await emitToTab(extraTabId, { type: 'chainChanged', chainId: hex });
+  }
+}
+
 async function openWalletUi(tabId?: number): Promise<void> {
   try {
     const side = chrome.sidePanel;
@@ -185,6 +215,7 @@ type Msg =
   | { type: 'SYNC_TOOLBAR_OPEN_MODE' }
   | { type: 'PROVIDER_GET_CONFIG' }
   | { type: 'PROVIDER_RPC'; request: ProviderRequest; origin?: string }
+  | { type: 'BROADCAST_CHAIN_CHANGED'; chainId: number }
   | { type: 'GET_DAPP_CONNECTION' }
   | { type: 'CONNECT_ACTIVE_TAB' }
   | { type: 'DISCONNECT_ACTIVE_TAB' }
@@ -292,6 +323,26 @@ chrome.runtime.onMessage.addListener(
       return true;
     }
 
+    if (message.type === 'BROADCAST_CHAIN_CHANGED') {
+      void (async () => {
+        try {
+          const chainId =
+            typeof message.chainId === 'number' && Number.isFinite(message.chainId)
+              ? Math.floor(message.chainId)
+              : null;
+          if (chainId == null || chainId <= 0) {
+            sendResponse({ ok: false, error: 'Invalid chainId' });
+            return;
+          }
+          await broadcastChainChanged(chainId);
+          sendResponse({ ok: true });
+        } catch (e) {
+          sendResponse({ ok: false, error: e instanceof Error ? e.message : String(e) });
+        }
+      })();
+      return true;
+    }
+
     if (message.type === 'PROVIDER_RPC' && message.request) {
       void (async () => {
         try {
@@ -299,10 +350,15 @@ chrome.runtime.onMessage.addListener(
           const origin =
             message.origin ??
             (sender.url ? originFromUrl(sender.url) ?? undefined : undefined);
-          const res = await handleProviderRpc(pk, message.request, origin, {
-            tabId: sender.tab?.id,
-            onApprovalQueued: () => void openWalletUi(sender.tab?.id),
-          });
+          const res: ProviderRpcResult = await handleProviderRpc(
+            pk,
+            message.request,
+            origin,
+            {
+              tabId: sender.tab?.id,
+              onApprovalQueued: () => void openWalletUi(sender.tab?.id),
+            },
+          );
           if (
             !pk &&
             message.request.method === 'eth_requestAccounts' &&
@@ -310,7 +366,11 @@ chrome.runtime.onMessage.addListener(
           ) {
             void openWalletUi(sender.tab?.id);
           }
-          sendResponse(res);
+          if (res.ok && res.switchedChainId != null) {
+            void broadcastChainChanged(res.switchedChainId, sender.tab?.id);
+          }
+          const { switchedChainId: _switched, ...response } = res;
+          sendResponse(response);
         } catch (e) {
           sendResponse({
             id: message.request.id,

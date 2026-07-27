@@ -127,7 +127,7 @@ const MAINNET_CHAINS: ChainDefinition[] = [
     name: 'BNB Smart Chain',
     shortName: 'bsc',
     kind: 'mainnet',
-    logoSlug: 'bsc',
+    logoSlug: 'binance',
     nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
     rpcUrls: [
       'https://bsc-dataseed.binance.org',
@@ -148,7 +148,7 @@ const MAINNET_CHAINS: ChainDefinition[] = [
     name: 'Avalanche',
     shortName: 'avax',
     kind: 'mainnet',
-    logoSlug: 'avax',
+    logoSlug: 'avalanche',
     nativeCurrency: { name: 'Avalanche', symbol: 'AVAX', decimals: 18 },
     rpcUrls: [
       'https://api.avax.network/ext/bc/C/rpc',
@@ -211,8 +211,7 @@ const MAINNET_CHAINS: ChainDefinition[] = [
     name: 'Robinhood Chain',
     shortName: 'hood',
     kind: 'mainnet',
-    logoSlug: 'ethereum',
-    logoURI: 'https://icons.llama.fi/chains/rsz_ethereum.jpg',
+    logoSlug: 'robinhood',
     nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
     rpcUrls: [
       'https://rpc.mainnet.chain.robinhood.com',
@@ -359,7 +358,7 @@ const MAINNET_CHAINS: ChainDefinition[] = [
     name: 'zkSync Era',
     shortName: 'zksync',
     kind: 'mainnet',
-    logoSlug: 'zksync',
+    logoSlug: 'zksync-era',
     nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
     rpcUrls: [
       'https://mainnet.era.zksync.io',
@@ -460,25 +459,25 @@ const MAINNET_CHAINS: ChainDefinition[] = [
     blockExplorerUrls: ['https://abscan.org'],
   },
   {
-    chainId: 34443,
-    name: 'Mode',
-    shortName: 'mode',
+    chainId: 100,
+    name: 'Gnosis',
+    shortName: 'gno',
     kind: 'mainnet',
-    logoSlug: 'mode',
-    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    logoSlug: 'gnosis',
+    nativeCurrency: { name: 'xDAI', symbol: 'xDAI', decimals: 18 },
     rpcUrls: [
-      'https://mainnet.mode.network',
-      'https://mode-rpc.publicnode.com',
-      'https://mode.drpc.org',
-      'https://rpc.ankr.com/mode',
-      'https://1rpc.io/mode',
-      'https://mode.llamarpc.com',
-      'https://mode-mainnet.public.blastapi.io',
-      'https://endpoints.omniatech.io/v1/mode/mainnet/public',
-      'https://mode.meowrpc.com',
-      'https://mode.gateway.tenderly.co',
+      'https://rpc.gnosischain.com',
+      'https://gnosis-rpc.publicnode.com',
+      'https://gnosis.drpc.org',
+      'https://rpc.ankr.com/gnosis',
+      'https://1rpc.io/gnosis',
+      'https://gnosis.llamarpc.com',
+      'https://gnosis-mainnet.public.blastapi.io',
+      'https://endpoints.omniatech.io/v1/gnosis/mainnet/public',
+      'https://gnosis.gateway.tenderly.co',
+      'https://rpc.gnosis.gateway.fm',
     ],
-    blockExplorerUrls: ['https://modescan.io'],
+    blockExplorerUrls: ['https://gnosisscan.io'],
   },
 ];
 
@@ -656,7 +655,7 @@ const TESTNET_CHAINS: ChainDefinition[] = [
     name: 'Robinhood Testnet',
     shortName: 'hood-test',
     kind: 'testnet',
-    logoSlug: 'ethereum',
+    logoSlug: 'robinhood',
     nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
     rpcUrls: [
       'https://rpc.testnet.chain.robinhood.com',
@@ -680,17 +679,44 @@ export const CHAIN_CATALOG: ChainDefinition[] = [...MAINNET_CHAINS, ...TESTNET_C
 const byId = new Map<number, ChainDefinition>();
 for (const c of CHAIN_CATALOG) byId.set(c.chainId, c);
 
+/** User-added chains (persisted) — overlays catalog by chain id. */
+let customChainsById = new Map<number, ChainDefinition>();
+
+export function setCustomChains(chains: ChainDefinition[]): void {
+  const next = new Map<number, ChainDefinition>();
+  for (const c of chains) {
+    if (!c || !Number.isFinite(c.chainId) || c.chainId <= 0) continue;
+    if (byId.has(c.chainId)) continue; /* curated entries win */
+    next.set(c.chainId, c);
+  }
+  customChainsById = next;
+}
+
+export function getCustomChains(): ChainDefinition[] {
+  return [...customChainsById.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function allChains(): ChainDefinition[] {
+  if (customChainsById.size === 0) return CHAIN_CATALOG;
+  return [...CHAIN_CATALOG, ...getCustomChains()];
+}
+
 export function chainById(chainId: number): ChainDefinition | undefined {
-  return byId.get(chainId);
+  return byId.get(chainId) ?? customChainsById.get(chainId);
 }
 
 export function chainsByKind(kind?: ChainKind): ChainDefinition[] {
-  if (!kind) return CHAIN_CATALOG;
-  return CHAIN_CATALOG.filter(c => c.kind === kind);
+  const list = allChains();
+  if (!kind) return list;
+  return list.filter(c => c.kind === kind);
 }
 
 export function allCatalogChainIds(): number[] {
-  return CHAIN_CATALOG.map(c => c.chainId);
+  return allChains().map(c => c.chainId);
+}
+
+export function isCuratedChain(chainId: number): boolean {
+  return byId.has(chainId);
 }
 
 export const MAX_RPC_OPTIONS = 10;

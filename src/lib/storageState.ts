@@ -3,7 +3,12 @@ import {
   DEFAULT_CHAIN_ID,
   DEFAULT_SLIPPAGE_PERCENT,
 } from './constants';
-import { setPreferredRpcMap, setCustomRpcMap } from './chainRpcRegistry';
+import {
+  setCustomChains,
+  type ChainDefinition,
+  type ChainKind,
+} from './chainCatalog';
+import { setPreferredRpcMap, setCustomRpcMap, setCustomChainRpcCatalog } from './chainRpcRegistry';
 
 export type ToolbarOpenMode = 'popup' | 'side_panel';
 /** Speed = auto-confirm dapp requests when unlocked; normal = prompt each time. */
@@ -22,6 +27,8 @@ export interface AppSettings {
   preferredRpcByChain?: Record<string, string>;
   /** Custom RPC URLs appended per chain id. */
   customRpcByChain?: Record<string, string[]>;
+  /** User-added chains (not in the curated catalog). */
+  customChains?: ChainDefinition[];
   /** When true, inject as window.ethereum (MetaMask drop-in). When false, use window.burningFox. */
   replaceMetaMask?: boolean;
   /** Optional Etherscan API v2 key — one key covers most *scan explorers for tx history. */
@@ -81,6 +88,59 @@ function normalizeCustomRpcMap(
   return Object.keys(out).length ? out : undefined;
 }
 
+function normalizeCustomChains(
+  raw: ChainDefinition[] | undefined,
+): ChainDefinition[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: ChainDefinition[] = [];
+  const seen = new Set<number>();
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') continue;
+    const chainId = normalizeChainId(row.chainId);
+    if (chainId == null || seen.has(chainId)) continue;
+    const name = typeof row.name === 'string' ? row.name.trim() : '';
+    const shortName = typeof row.shortName === 'string' ? row.shortName.trim() : '';
+    const kind: ChainKind = row.kind === 'testnet' ? 'testnet' : 'mainnet';
+    const symbol =
+      typeof row.nativeCurrency?.symbol === 'string'
+        ? row.nativeCurrency.symbol.trim()
+        : '';
+    const rpcUrls = Array.isArray(row.rpcUrls)
+      ? row.rpcUrls.filter(u => typeof u === 'string' && u.trim()).map(u => u.trim())
+      : [];
+    if (!name || !shortName || !symbol || rpcUrls.length === 0) continue;
+    const explorers = Array.isArray(row.blockExplorerUrls)
+      ? row.blockExplorerUrls.filter(u => typeof u === 'string' && u.trim()).map(u => u.trim())
+      : [];
+    const decimals =
+      typeof row.nativeCurrency?.decimals === 'number' && Number.isFinite(row.nativeCurrency.decimals)
+        ? Math.floor(row.nativeCurrency.decimals)
+        : 18;
+    const currencyName =
+      typeof row.nativeCurrency?.name === 'string' && row.nativeCurrency.name.trim()
+        ? row.nativeCurrency.name.trim()
+        : symbol;
+    const def: ChainDefinition = {
+      chainId,
+      name,
+      shortName,
+      kind,
+      nativeCurrency: { name: currencyName, symbol, decimals },
+      rpcUrls,
+      blockExplorerUrls: explorers,
+    };
+    if (typeof row.logoSlug === 'string' && row.logoSlug.trim()) {
+      def.logoSlug = row.logoSlug.trim();
+    }
+    if (typeof row.logoURI === 'string' && row.logoURI.trim()) {
+      def.logoURI = row.logoURI.trim();
+    }
+    seen.add(chainId);
+    out.push(def);
+  }
+  return out.length ? out : undefined;
+}
+
 function applyRpcPreferences(settings: AppSettings): void {
   const preferred: Record<number, string> = {};
   const custom: Record<number, string[]> = {};
@@ -92,6 +152,9 @@ function applyRpcPreferences(settings: AppSettings): void {
     const id = Number(k);
     if (Number.isFinite(id) && list?.length) custom[id] = list;
   }
+  const customChains = settings.customChains ?? [];
+  setCustomChains(customChains);
+  setCustomChainRpcCatalog(customChains);
   setPreferredRpcMap(preferred);
   setCustomRpcMap(custom);
 }
@@ -120,6 +183,7 @@ export async function loadPersisted(): Promise<PersistedState> {
           activeChainId: normalizeChainId(row.settings?.activeChainId),
           preferredRpcByChain: normalizePreferredRpcMap(row.settings?.preferredRpcByChain),
           customRpcByChain: normalizeCustomRpcMap(row.settings?.customRpcByChain),
+          customChains: normalizeCustomChains(row.settings?.customChains),
           replaceMetaMask: row.settings?.replaceMetaMask !== false,
           explorerApiKey:
             typeof row.settings?.explorerApiKey === 'string' && row.settings.explorerApiKey.trim()

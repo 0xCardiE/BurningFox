@@ -23,10 +23,12 @@ export function SettingsView({
   settings,
   onSaved,
   onBack,
+  onOpenNetworks,
 }: {
   settings: AppSettings;
   onSaved: () => void;
   onBack: () => void;
+  onOpenNetworks?: () => void;
 }) {
   const [slippageStr, setSlippageStr] = useState(() =>
     String(effectiveSlippagePercent(settings)),
@@ -226,6 +228,20 @@ export function SettingsView({
           <p className="muted" style={{ fontSize: 12 }}>
             Sent to Li.FI as a ratio (example: 5% → 0.05). Used when requesting quotes.
           </p>
+
+          {onOpenNetworks ? (
+            <div className="bfox-settings-link-card">
+              <div>
+                <strong>Networks &amp; RPCs</strong>
+                <p className="muted" style={{ margin: '4px 0 0', fontSize: 12 }}>
+                  Add custom chains and manage RPC endpoints — kept separate from these settings.
+                </p>
+              </div>
+              <button type="button" className="ghost" onClick={onOpenNetworks}>
+                Open
+              </button>
+            </div>
+          ) : null}
 
           <label htmlFor="autolock" style={{ marginTop: 16 }}>
             Auto-lock after idle

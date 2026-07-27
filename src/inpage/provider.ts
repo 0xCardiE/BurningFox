@@ -169,8 +169,23 @@ class BurningFoxProvider {
       this.chainId = result;
       this.networkVersion = String(Number.parseInt(result, 16) || 1);
     } else if (args.method === 'wallet_switchEthereumChain') {
-      /* chain id refreshed via sync / next eth_chainId */
-      void this.syncState();
+      const p = args.params?.[0] as { chainId?: string } | undefined;
+      if (typeof p?.chainId === 'string') {
+        this.chainId = p.chainId;
+        this.networkVersion = String(Number.parseInt(p.chainId, 16) || 1);
+        this.emit('chainChanged', p.chainId);
+      } else {
+        void this.syncState();
+      }
+    } else if (args.method === 'wallet_addEthereumChain') {
+      const p = args.params?.[0] as { chainId?: string } | undefined;
+      if (typeof p?.chainId === 'string') {
+        this.chainId = p.chainId;
+        this.networkVersion = String(Number.parseInt(p.chainId, 16) || 1);
+        this.emit('chainChanged', p.chainId);
+      } else {
+        void this.syncState();
+      }
     }
 
     return result;

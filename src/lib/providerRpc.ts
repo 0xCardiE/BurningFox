@@ -1,5 +1,11 @@
 import { getAddress } from 'viem';
-import { chainById, CHAIN_CATALOG } from './chainCatalog';
+import {
+  allChains,
+  chainById,
+  getCustomChains,
+  isCuratedChain,
+  type ChainDefinition,
+} from './chainCatalog';
 import {
   addressFromPrivateKey,
   bytesToHexMessage,
@@ -57,12 +63,17 @@ export async function executeSignRequest(
   throw Object.assign(new Error(`Unsupported method: ${method}`), { code: 4200 });
 }
 
+export type ProviderRpcResult = ProviderResponse & {
+  /** Set when switch/add chain succeeded so background can emit chainChanged. */
+  switchedChainId?: number;
+};
+
 export async function handleProviderRpc(
   pk: `0x${string}` | null,
   request: ProviderRequest,
   origin?: string,
   opts?: { tabId?: number; onApprovalQueued?: () => void },
-): Promise<ProviderResponse> {
+): Promise<ProviderRpcResult> {
   const { id, method, params = [] } = request;
   try {
     const { settings } = await loadPersisted();
@@ -106,8 +117,14 @@ export async function handleProviderRpc(
       const p = params[0] as { chainId?: string } | undefined;
       const next = parseChainIdParam(p?.chainId);
       if (next == null) throw new Error('Invalid chainId');
+      if (!chainById(next)) {
+        throw Object.assign(
+          new Error(`Unrecognized chain ID ${next}. Add the chain first.`),
+          { code: 4902 },
+        );
+      }
       await patchSettings({ activeChainId: next });
-      return { id, ok: true, result: null };
+      return { id, ok: true, result: null, switchedChainId: next };
     }
 
     if (method === 'wallet_addEthereumChain') {
@@ -138,8 +155,43 @@ export async function handleProviderRpc(
           [String(cid)]: custom,
         };
       }
+      if (!isCuratedChain(cid) && !chainById(cid)) {
+        const name = (p?.chainName?.trim() || `Chain ${cid}`).slice(0, 64);
+        const symbol = (p?.nativeCurrency?.symbol?.trim() || 'ETH').slice(0, 16);
+        const decimals =
+          typeof p?.nativeCurrency?.decimals === 'number' &&
+          Number.isFinite(p.nativeCurrency.decimals)
+            ? Math.floor(p.nativeCurrency.decimals)
+            : 18;
+        const explorers = (p?.blockExplorerUrls ?? [])
+          .filter(u => typeof u === 'string' && u.trim())
+          .map(u => u.trim());
+        const rpcs = (p?.rpcUrls ?? [])
+          .filter(u => typeof u === 'string' && u.trim())
+          .map(u => u.trim());
+        if (rpcs.length === 0) throw new Error('At least one RPC URL is required');
+        const def: ChainDefinition = {
+          chainId: cid,
+          name,
+          shortName:
+            name
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .slice(0, 24) || `chain-${cid}`,
+          kind: 'mainnet',
+          nativeCurrency: {
+            name: p?.nativeCurrency?.name?.trim() || symbol,
+            symbol,
+            decimals,
+          },
+          rpcUrls: rpcs,
+          blockExplorerUrls: explorers,
+        };
+        const existing = getCustomChains().filter(c => c.chainId !== cid);
+        patch.customChains = [...existing, def];
+      }
       await patchSettings(patch);
-      return { id, ok: true, result: null };
+      return { id, ok: true, result: null, switchedChainId: cid };
     }
 
     if (isSignMethod(method)) {
@@ -180,5 +232,5 @@ export function chainMetadataForProvider(chainId: number): unknown {
 }
 
 export function allProviderChains(): unknown[] {
-  return CHAIN_CATALOG.map(c => chainMetadataForProvider(c.chainId));
+  return allChains().map(c => chainMetadataForProvider(c.chainId));
 }
