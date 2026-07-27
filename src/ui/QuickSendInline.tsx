@@ -15,8 +15,8 @@ const COLLAPSE_AFTER_SEC = 30;
 
 function shortAddress(addr: string): string {
   const a = addr.trim();
-  if (a.length <= 14) return a;
-  return `${a.slice(0, 6)}…${a.slice(-6)}`;
+  if (a.length <= 21) return a;
+  return `${a.slice(0, 10)}…${a.slice(-10)}`;
 }
 
 export function QuickSendInline({

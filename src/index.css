@@ -364,62 +364,23 @@ hr.sep {
 .bbox-mark {
   display: block;
   flex-shrink: 0;
-  overflow: visible;
-  transform-origin: 50% 55%;
-}
-
-.bbox-mark__glow {
-  transition: opacity 0.35s ease, transform 0.45s ease;
-  transform-origin: 64px 70px;
 }
 
 .bbox-mark__flame {
   transform-box: fill-box;
-  transform-origin: bottom center;
+  transform-origin: 50% 88%;
 }
 
-.bbox-mark--live .bbox-mark__flame--c {
-  animation: bbox-flame-c 2.6s ease-in-out infinite;
-}
-.bbox-mark--live .bbox-mark__flame--ci {
-  animation: bbox-flame-ci 2.1s ease-in-out infinite;
-}
-.bbox-mark--live .bbox-mark__flame--l,
-.bbox-mark--live .bbox-mark__flame--li {
-  animation: bbox-flame-l 2.4s ease-in-out infinite;
-}
-.bbox-mark--live .bbox-mark__flame--r,
-.bbox-mark--live .bbox-mark__flame--ri {
-  animation: bbox-flame-r 2.5s ease-in-out infinite;
-}
-.bbox-mark--live .bbox-mark__ember--l {
-  animation: bbox-ember 2.8s ease-in-out infinite;
-}
-.bbox-mark--live .bbox-mark__ember--r {
-  animation: bbox-ember 2.8s ease-in-out infinite 0.4s;
+.bbox-mark--live .bbox-mark__flame {
+  animation: bbox-flame 2.4s ease-in-out infinite;
 }
 
 /* Rollover: hotter, faster burn */
-.bbox-mark--live:hover .bbox-mark__glow,
-.unlock-brand:hover .bbox-mark--live .bbox-mark__glow,
-.screen-header-left:hover .bbox-mark--live .bbox-mark__glow,
-.loading-screen:hover .bbox-mark--live .bbox-mark__glow {
-  transform: scale(1.18);
-  filter: brightness(1.25);
-}
-
 .bbox-mark--live:hover .bbox-mark__flame,
 .unlock-brand:hover .bbox-mark--live .bbox-mark__flame,
 .screen-header-left:hover .bbox-mark--live .bbox-mark__flame,
 .loading-screen:hover .bbox-mark--live .bbox-mark__flame {
-  animation-duration: 0.55s;
-}
-
-.bbox-mark--live:hover .bbox-mark__ember,
-.unlock-brand:hover .bbox-mark--live .bbox-mark__ember,
-.screen-header-left:hover .bbox-mark--live .bbox-mark__ember {
-  animation-duration: 0.7s;
-  stroke: #ff9a1a;
+  animation-duration: 0.6s;
 }
 
 .bbox-mark--live:hover,
@@ -428,72 +389,21 @@ hr.sep {
   filter: drop-shadow(0 0 10px rgba(255, 109, 0, 0.45));
 }
 
-@keyframes bbox-flame-c {
+@keyframes bbox-flame {
   0%,
   100% {
-    transform: translateY(0) scaleY(1) scaleX(1);
+    transform: scale(1, 1) rotate(0deg);
   }
-  40% {
-    transform: translateY(-2px) scaleY(1.08) scaleX(0.94);
+  30% {
+    transform: scale(0.965, 1.05) rotate(-1.5deg);
   }
-  70% {
-    transform: translateY(-1px) scaleY(1.02) scaleX(1.04);
-  }
-}
-
-@keyframes bbox-flame-ci {
-  0%,
-  100% {
-    transform: translateY(0) scaleY(1);
-    opacity: 1;
-  }
-  50% {
-    transform: translateY(-3px) scaleY(1.12);
-    opacity: 0.85;
-  }
-}
-
-@keyframes bbox-flame-l {
-  0%,
-  100% {
-    transform: translate(0, 0) rotate(0deg) scaleY(1);
-  }
-  35% {
-    transform: translate(-1px, -2px) rotate(-4deg) scaleY(1.1);
-  }
-  65% {
-    transform: translate(1px, -1px) rotate(2deg) scaleY(0.96);
-  }
-}
-
-@keyframes bbox-flame-r {
-  0%,
-  100% {
-    transform: translate(0, 0) rotate(0deg) scaleY(1);
-  }
-  35% {
-    transform: translate(1px, -2px) rotate(4deg) scaleY(1.1);
-  }
-  65% {
-    transform: translate(-1px, -1px) rotate(-2deg) scaleY(0.96);
-  }
-}
-
-@keyframes bbox-ember {
-  0%,
-  100% {
-    opacity: 0.65;
-    stroke-width: 5;
-  }
-  50% {
-    opacity: 0.95;
-    stroke-width: 6;
+  60% {
+    transform: scale(1.035, 0.97) rotate(1deg);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bbox-mark--live .bbox-mark__flame,
-  .bbox-mark--live .bbox-mark__ember {
+  .bbox-mark--live .bbox-mark__flame {
     animation: none !important;
   }
   .bbox-mark--live:hover,
@@ -3469,7 +3379,7 @@ button.bfox-dd__option--on:hover {
 /* Quick Send inline row */
 .bfox-quick-send-inline {
   display: grid;
-  grid-template-columns: minmax(148px, 1.55fr) minmax(100px, 1fr) max-content max-content;
+  grid-template-columns: max-content minmax(0, 1fr) max-content max-content;
   column-gap: 6px;
   row-gap: 6px;
   align-items: center;
@@ -3492,7 +3402,9 @@ button.bfox-dd__option--on:hover {
 
 .bfox-quick-send-inline__addr {
   grid-column: 1;
-  width: 100%;
+  /* Sized for 10…10 truncated address; full address scrolls when focused */
+  width: calc(21ch + 16px);
+  max-width: calc(21ch + 16px);
   min-width: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;

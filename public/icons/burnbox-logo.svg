@@ -1,76 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none" role="img" aria-label="BurnBox">
   <defs>
-    <radialGradient id="bbGlow" cx="64" cy="72" r="56" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FF8A3D" stop-opacity="0.55"/>
-      <stop offset="0.55" stop-color="#FF5A1F" stop-opacity="0.22"/>
-      <stop offset="1" stop-color="#FF3D00" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="bbBox" x1="28" y1="48" x2="100" y2="112" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FFB14A"/>
-      <stop offset="0.45" stop-color="#FF7A1A"/>
-      <stop offset="1" stop-color="#E04800"/>
+    <linearGradient id="bbBox" x1="64" y1="8" x2="64" y2="120" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFA033"/>
+      <stop offset="1" stop-color="#EE4A08"/>
     </linearGradient>
-    <linearGradient id="bbBoxDeep" x1="64" y1="56" x2="64" y2="112" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FF8C2E"/>
-      <stop offset="1" stop-color="#C43A00"/>
-    </linearGradient>
-    <linearGradient id="bbLid" x1="30" y1="44" x2="98" y2="58" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FFC14A"/>
-      <stop offset="1" stop-color="#FF6A00"/>
-    </linearGradient>
-    <linearGradient id="bbFlameOuter" x1="64" y1="4" x2="64" y2="52" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FFE566"/>
-      <stop offset="0.4" stop-color="#FF9A1A"/>
-      <stop offset="1" stop-color="#FF4D00"/>
-    </linearGradient>
-    <linearGradient id="bbFlameInner" x1="64" y1="10" x2="64" y2="48" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FFF6C8"/>
-      <stop offset="0.5" stop-color="#FFD24A"/>
-      <stop offset="1" stop-color="#FF8A00" stop-opacity="0.85"/>
-    </linearGradient>
-    <linearGradient id="bbGlowIn" x1="64" y1="58" x2="64" y2="100" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FFF3E0" stop-opacity="0.95"/>
-      <stop offset="1" stop-color="#FFD7A8" stop-opacity="0.35"/>
-    </linearGradient>
-    <filter id="bbSoft" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="1.2" result="b"/>
-      <feMerge>
-        <feMergeNode in="b"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
   </defs>
-
-  <!-- ambient glow -->
-  <circle cx="64" cy="70" r="56" fill="url(#bbGlow)"/>
-
-  <!-- flames rising from the box -->
-  <g filter="url(#bbSoft)">
-    <path d="M40 52c-2-16 5-28 12-34 1 9 4 15 8 19-8 2-14 8-20 15Z" fill="url(#bbFlameOuter)" opacity="0.95"/>
-    <path d="M64 4c-3 11-2 22 1 30 4-10 10-16 16-19-4 11-4 22-2 30C70 32 64 18 64 4Z" fill="url(#bbFlameOuter)"/>
-    <path d="M88 52c2-16-5-28-12-34-1 9-4 15-8 19 8 2 14 8 20 15Z" fill="url(#bbFlameOuter)" opacity="0.95"/>
-    <path d="M50 48c0-11 4-19 8-23 2 7 4 12 5 17-5 1-9 4-13 6Z" fill="url(#bbFlameInner)" opacity="0.9"/>
-    <path d="M64 14c-1 8 0 14 2 20 3-7 6-11 10-14-3 8-3 14-1 20-5-6-9-14-11-26Z" fill="url(#bbFlameInner)"/>
-    <path d="M78 48c0-11-4-19-8-23-2 7-4 12-5 17 5 1 9 4 13 6Z" fill="url(#bbFlameInner)" opacity="0.9"/>
-  </g>
-
-  <!-- box body -->
-  <path d="M30 56h68v48c0 6-5 10-11 10H41c-6 0-11-4-11-10V56Z" fill="url(#bbBox)"/>
-  <path d="M36 104h56c4 0 7-2 7-5v-8H29v8c0 3 3 5 7 5Z" fill="url(#bbBoxDeep)" opacity="0.55"/>
-
-  <!-- open lid (angled back) -->
-  <path d="M28 56c2-10 10-16 18-18l42-6c8-1 16 4 18 14L98 56H30Z" fill="url(#bbLid)"/>
-  <path d="M32 54h64" stroke="#BF360C" stroke-width="2.5" stroke-linecap="round" opacity="0.28"/>
-
-  <!-- inner glow / contents -->
-  <ellipse cx="64" cy="78" rx="22" ry="14" fill="url(#bbGlowIn)"/>
-  <path d="M48 72c5 4 10 6 16 6s11-2 16-6" stroke="#E8A86A" stroke-width="2" stroke-linecap="round" opacity="0.55"/>
-
-  <!-- front panel detail -->
-  <rect x="46" y="86" width="36" height="8" rx="3" fill="#FFF3E0" opacity="0.35"/>
-  <path d="M52 90h24" stroke="#8B3A18" stroke-width="2.2" stroke-linecap="round" opacity="0.55"/>
-
-  <!-- side ember hints -->
-  <path d="M22 78c6-8 12-12 18-14" stroke="#FF6B1A" stroke-width="5" stroke-linecap="round" opacity="0.75"/>
-  <path d="M106 78c-6-8-12-12-18-14" stroke="#FF6B1A" stroke-width="5" stroke-linecap="round" opacity="0.75"/>
+  <!-- the box -->
+  <rect x="8" y="8" width="112" height="112" rx="28" fill="url(#bbBox)"/>
+  <!-- the flame (inner teardrop is a cutout showing the box) -->
+  <path fill-rule="evenodd" clip-rule="evenodd" fill="#FFF7EC" d="M67 26c1 10 6 16 12 23 7 8 11 16 11 25 0 17-12 28-26 28-14 0-26-11-26-28 0-7 2-13 6-19 1 5 4 9 8 11-3-13 3-29 15-40ZM64 88c-7 0-12-5-12-11 0-6 4-10 10-12 5-2 9-5 11-9 2 4 3 8 3 12 0 11-5 20-12 20Z"/>
 </svg>
