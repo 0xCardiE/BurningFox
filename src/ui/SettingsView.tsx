@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { getAddress } from 'viem';
-import { getUnlockedAccount } from '../lib/accountSession';
+import { getSessionPrivateKey, getUnlockedAccount } from '../lib/accountSession';
 import {
   lockWallet,
   reopenWalletSurfaceAfterModeChange,
@@ -55,7 +55,7 @@ export function SettingsView({
 
   const account = getUnlockedAccount();
   const walletAddress = account ? getAddress(account.address) : null;
-  const walletPublicKey = account?.publicKey ?? null;
+  const walletPrivateKey = getSessionPrivateKey();
 
   async function copyWalletField(kind: 'addr' | 'pk', text: string) {
     try {
@@ -180,32 +180,35 @@ export function SettingsView({
                 </button>
               </div>
 
-              {walletPublicKey ? (
+              {walletPrivateKey ? (
                 <>
-                  <label style={{ marginTop: 10, marginBottom: 4 }} htmlFor="wallet-pubkey">
-                    Public key (hex)
+                  <label style={{ marginTop: 10, marginBottom: 4 }} htmlFor="wallet-privkey">
+                    Private key
                   </label>
                   <p
-                    id="wallet-pubkey"
+                    id="wallet-privkey"
                     className="mono"
                     style={{
                       margin: '4px 0 6px',
-                      fontSize: 10,
-                      wordBreak: 'break-all',
+                      fontSize: 12,
+                      letterSpacing: '0.08em',
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none',
                       opacity: 0.95,
                     }}
+                    aria-label="Private key hidden"
                   >
-                    {walletPublicKey}
+                    ••••••••••••••••••••••••••••••••
                   </p>
                   <div className="row" style={{ marginBottom: 0 }}>
                     <p className="muted" style={{ fontSize: 11, margin: 0, flex: '1 1 auto' }}>
-                      Uncompressed secp256k1 key; your address is derived from this.
+                      Hidden for safety — copy only when you need to back up or import elsewhere.
                     </p>
                     <button
                       type="button"
                       className="ghost"
                       style={{ flex: '0 0 auto', padding: '6px 12px', fontSize: 12 }}
-                      onClick={() => void copyWalletField('pk', walletPublicKey)}
+                      onClick={() => void copyWalletField('pk', walletPrivateKey)}
                     >
                       {copyFlash === 'pk' ? 'Copied' : 'Copy'}
                     </button>

@@ -52,7 +52,7 @@ export function NetworksManageView({
   const activeChainId = effectiveActiveChainId(settings);
   const [panel, setPanel] = useState<Panel>('list');
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [filter, setFilter] = useState<'all' | ChainKind>('all');
+  const [filter, setFilter] = useState<ChainKind>('mainnet');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -66,9 +66,7 @@ export function NetworksManageView({
   const [addKind, setAddKind] = useState<ChainKind>('mainnet');
 
   const chains = useMemo(() => {
-    const list = allChains();
-    const filtered =
-      filter === 'all' ? list : list.filter(c => c.kind === filter);
+    const filtered = allChains().filter(c => c.kind === filter);
     return [...filtered].sort((a, b) => {
       if (a.chainId === activeChainId) return -1;
       if (b.chainId === activeChainId) return 1;
@@ -329,7 +327,6 @@ export function NetworksManageView({
               <div className="bfox-networks__filters" role="group" aria-label="Filter chains">
                 {(
                   [
-                    ['all', 'All'],
                     ['mainnet', 'Mainnets'],
                     ['testnet', 'Testnets'],
                   ] as const
