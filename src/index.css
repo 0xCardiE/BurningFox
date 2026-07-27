@@ -3469,7 +3469,7 @@ button.bfox-dd__option--on:hover {
 /* Quick Send inline row */
 .bfox-quick-send-inline {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 72px max-content max-content;
+  grid-template-columns: minmax(148px, 1.55fr) minmax(100px, 1fr) max-content max-content;
   column-gap: 6px;
   row-gap: 6px;
   align-items: center;
@@ -3482,7 +3482,7 @@ button.bfox-dd__option--on:hover {
 .bfox-quick-send-inline input {
   min-width: 0;
   height: 34px;
-  padding: 0 10px;
+  padding: 0 8px;
   font-size: 12px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
@@ -3492,11 +3492,19 @@ button.bfox-dd__option--on:hover {
 
 .bfox-quick-send-inline__addr {
   grid-column: 1;
+  width: 100%;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: -0.02em;
 }
 
 .bfox-quick-send-inline__amt {
   grid-column: 2;
+  width: 100%;
+  min-width: 0;
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .bfox-quick-send-inline__max {
@@ -3568,14 +3576,21 @@ button.bfox-dd__option--on:hover {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 2px;
+  gap: 1px;
   flex-shrink: 0;
+  text-align: right;
 }
 
 .bfox-quick-send-inline__hint {
   font-size: 12px;
   font-weight: 650;
   white-space: nowrap;
+}
+
+.bfox-quick-send-inline__to {
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: -0.02em;
 }
 
 .bfox-quick-send-inline__timer {

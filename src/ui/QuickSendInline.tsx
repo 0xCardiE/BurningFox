@@ -13,6 +13,12 @@ import { describeError } from '../lib/utils';
 
 const COLLAPSE_AFTER_SEC = 30;
 
+function shortAddress(addr: string): string {
+  const a = addr.trim();
+  if (a.length <= 14) return a;
+  return `${a.slice(0, 6)}…${a.slice(-6)}`;
+}
+
 export function QuickSendInline({
   token,
   chainId,
@@ -33,6 +39,7 @@ export function QuickSendInline({
   const [err, setErr] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(COLLAPSE_AFTER_SEC);
+  const [addrFocused, setAddrFocused] = useState(true);
 
   const toValid = toRaw.trim() && isAddress(toRaw.trim());
   const to = toValid ? getAddress(toRaw.trim()) : null;
@@ -109,6 +116,7 @@ export function QuickSendInline({
 
   const explorerUrl = txHash ? txExplorerLink(chainId, txHash) : undefined;
   const sentAmount = amount ?? 0n;
+  const sentTo = to;
 
   if (txHash) {
     return (
@@ -132,23 +140,32 @@ export function QuickSendInline({
           <span className="bfox-quick-send-inline__hint">
             {formatTokenAmount(sentAmount, token.decimals)} {token.symbol}
           </span>
+          {sentTo ? (
+            <span className="bfox-quick-send-inline__to muted">to {shortAddress(sentTo)}</span>
+          ) : null}
           <span className="bfox-quick-send-inline__timer muted">{secondsLeft}s</span>
         </div>
       </div>
     );
   }
 
+  const addrDisplay =
+    addrFocused || !toValid ? toRaw : shortAddress(getAddress(toRaw.trim()));
+
   return (
     <div className="bfox-quick-send-inline">
       <input
         className="bfox-quick-send-inline__addr"
-        value={toRaw}
+        value={addrDisplay}
         onChange={e => setToRaw(e.target.value)}
-        placeholder="Recipient 0x…"
+        onFocus={() => setAddrFocused(true)}
+        onBlur={() => setAddrFocused(false)}
+        placeholder="0x…"
         spellCheck={false}
         autoComplete="off"
         autoFocus
         disabled={busy}
+        title={toValid ? getAddress(toRaw.trim()) : undefined}
       />
       <input
         className="bfox-quick-send-inline__amt"
