@@ -67,7 +67,7 @@ export const DEFAULT_QUERIES: SearchQuery[] = [
   {
     id: 'reddit-metamask',
     label: 'Reddit r/MetaMask complaints',
-    query: 'subreddit:MetaMask (help OR problem OR hate OR frustrating OR "doesn\'t work")',
+    query: 'subreddit:Metamask (help OR problem OR hate OR frustrating OR "doesn\'t work")',
     sources: ['reddit'],
     enabled: true,
   },
@@ -186,5 +186,5 @@ export const REDDIT_SUBREDDITS = [
   'TREZOR',
 ];
 
-/** Subreddits scanned during dev-focused bonus passes */
-export const DEV_SUBREDDITS = ['ethdev', 'solidity', 'web3', 'learnprogramming'];
+/** Subreddits scanned during bonus passes — lowercase for Arctic Shift */
+export const DEV_SUBREDDITS = ['ethdev', 'solidity', 'web3'];

@@ -19,17 +19,49 @@ function afterDate(timeRange: 'year' | 'month' | 'week'): string {
 
 function parseSubreddit(query: string): string | null {
   const m = query.match(/\bsubreddit:(\w+)/i);
-  return m ? m[1] : null;
+  return m ? m[1].toLowerCase() : null;
 }
 
-function keywordsFromQuery(query: string): string {
-  return query
-    .replace(/\bsubreddit:\w+/gi, '')
+/** Arctic Shift keyword search only works with short terms — pick a few seeds */
+function seedKeywords(query: string): string[] {
+  const stop = new Set([
+    'or', 'and', 'the', 'a', 'an', 'to', 'for', 'of', 'in', 'on', 'with', 'from',
+    'crypto', 'wallet', 'wallets', 'site', 'reddit', 'com', 'stackoverflow',
+  ]);
+
+  const raw = query
+    .replace(/\bsubreddit:\w+/gi, ' ')
+    .replace(/site:\S+/gi, ' ')
     .replace(/[()"]/g, ' ')
-    .replace(/\bOR\b/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 120);
+    .replace(/\bOR\b|\bAND\b/gi, ' ')
+    .toLowerCase();
+
+  const preferred = [
+    'frustrating', 'confused', 'stuck', 'broken', 'error', 'failed', 'hate',
+    'seed', 'gas', 'approval', 'signing', 'bridge', 'swap', 'wagmi', 'viem',
+    'walletconnect', 'localhost', 'metamask', 'phantom', 'ledger', 'trezor',
+    'help', 'problem', 'issue', 'integrate', 'rpc', 'chainid',
+  ];
+
+  const found = preferred.filter((p) => raw.includes(p));
+  if (found.length) return [...new Set(found)].slice(0, 4);
+
+  const tokens = raw
+    .split(/[^a-z0-9+-]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 4 && !stop.has(t));
+
+  return [...new Set(tokens)].slice(0, 3);
+}
+
+function looksPainful(title: string, body: string): boolean {
+  const text = `${title} ${body}`.toLowerCase();
+  const signals = [
+    'help', 'problem', 'issue', 'error', 'fail', 'stuck', 'confus', 'frustrat',
+    'hate', 'broken', "can't", 'cannot', "doesn't", 'doesnt', 'wrong', 'lost',
+    'wish', 'workaround', 'how do i', 'why is', 'not working', 'unable',
+  ];
+  return signals.some((s) => text.includes(s));
 }
 
 interface RedditOAuthToken {
@@ -71,20 +103,7 @@ async function getOAuthToken(): Promise<string | null> {
 interface OAuthListing {
   data?: {
     after?: string | null;
-    children?: Array<{
-      data: {
-        id: string;
-        title: string;
-        selftext?: string;
-        url: string;
-        permalink: string;
-        author: string;
-        subreddit: string;
-        created_utc: number;
-        score: number;
-        num_comments: number;
-      };
-    }>;
+    children?: Array<{ data: ArcticPost }>;
   };
 }
 
@@ -122,14 +141,15 @@ async function searchRedditOAuth(
     after = json.data?.after ?? undefined;
 
     for (const child of children) {
-      posts.push(mapRedditPost(child.data, query, options.jobId, seen));
+      const mapped = mapRedditPost(child.data, query, options.jobId, seen);
+      if (mapped) posts.push(mapped);
     }
 
     if (!after || children.length === 0) break;
     await sleep(options.delayMs);
   }
 
-  return posts.filter(Boolean) as ResearchPost[];
+  return posts;
 }
 
 interface ArcticPost {
@@ -151,24 +171,17 @@ interface ArcticResponse {
 }
 
 function mapRedditPost(
-  d: {
-    id: string;
-    title: string;
-    selftext?: string;
-    url: string;
-    permalink?: string;
-    author: string;
-    subreddit: string;
-    created_utc: number;
-    score: number;
-    num_comments: number;
-  },
+  d: ArcticPost,
   query: string,
   jobId: string | undefined,
   seen: Set<string>,
 ): ResearchPost | null {
-  const permalink = d.permalink?.startsWith('/') ? `https://www.reddit.com${d.permalink}` : d.url;
-  const link = permalink.startsWith('http') ? permalink : `https://www.reddit.com/r/${d.subreddit}/comments/${d.id}`;
+  const permalink = d.permalink?.startsWith('/')
+    ? `https://www.reddit.com${d.permalink}`
+    : d.url;
+  const link = permalink.startsWith('http')
+    ? permalink
+    : `https://www.reddit.com/r/${d.subreddit}/comments/${d.id}`;
   const id = postKey('reddit', link);
   if (seen.has(id)) return null;
   seen.add(id);
@@ -197,45 +210,80 @@ function mapRedditPost(
   };
 }
 
+async function arcticFetch(
+  subreddit: string,
+  params: Record<string, string>,
+): Promise<ArcticPost[]> {
+  const qs = new URLSearchParams({
+    subreddit: subreddit.toLowerCase(),
+    ...params,
+  });
+
+  const res = await fetch(`https://arctic-shift.photon-reddit.com/api/posts/search?${qs}`, {
+    headers: { Accept: 'application/json' },
+  });
+
+  if (!res.ok) {
+    // Active subs sometimes 422/timeout — treat as empty and let caller try fallbacks
+    if (res.status === 422 || res.status === 429 || res.status === 503) return [];
+    throw new Error(`Arctic Shift failed (${res.status}) for r/${subreddit}`);
+  }
+
+  const json = (await res.json()) as ArcticResponse;
+  if (json.error) return [];
+  return json.data ?? [];
+}
+
 async function searchArcticShiftSubreddit(
   subreddit: string,
   queryText: string,
   options: { timeRange: 'year' | 'month' | 'week'; delayMs: number; jobId?: string },
   seen: Set<string>,
 ): Promise<ResearchPost[]> {
-  const params = new URLSearchParams({
-    subreddit,
-    query: queryText,
-    after: afterDate(options.timeRange),
-    limit: '100',
-    sort: 'desc',
-  });
-
-  const res = await fetch(`https://arctic-shift.photon-reddit.com/api/posts/search?${params}`, {
-    headers: { Accept: 'application/json' },
-  });
-
-  if (!res.ok) {
-    throw new Error(`Arctic Shift failed (${res.status}) for r/${subreddit}`);
-  }
-
-  const json = (await res.json()) as ArcticResponse;
-  if (json.error) {
-    throw new Error(`Arctic Shift: ${json.error}`);
-  }
-
+  const after = afterDate(options.timeRange);
+  const seeds = seedKeywords(queryText);
   const posts: ResearchPost[] = [];
-  for (const d of json.data ?? []) {
-    const mapped = mapRedditPost(
-      {
-        ...d,
-        permalink: d.permalink ?? `/r/${d.subreddit}/comments/${d.id}`,
-      },
-      `${queryText} subreddit:${subreddit}`,
-      options.jobId,
-      seen,
-    );
-    if (mapped) posts.push(mapped);
+  const label = queryText || 'wallet pain';
+
+  // 1) Try short keyword searches (Arctic only handles short terms well)
+  const seedsToTry = (seeds.length ? seeds : ['help']).slice(0, 2);
+  for (const seed of seedsToTry) {
+    const rows = await arcticFetch(subreddit, {
+      query: seed,
+      after,
+      limit: '50',
+      sort: 'desc',
+    });
+    for (const d of rows) {
+      if (!looksPainful(d.title, d.selftext ?? '')) continue;
+      const mapped = mapRedditPost(
+        { ...d, permalink: d.permalink ?? `/r/${d.subreddit}/comments/${d.id}` },
+        `${label} subreddit:${subreddit}`,
+        options.jobId,
+        seen,
+      );
+      if (mapped) posts.push(mapped);
+    }
+    await sleep(400);
+  }
+
+  // 2) Fallback: recent posts in the sub, filter client-side for pain language
+  if (posts.length < 8) {
+    const recent = await arcticFetch(subreddit, {
+      after,
+      limit: '75',
+      sort: 'desc',
+    });
+    for (const d of recent) {
+      if (!looksPainful(d.title, d.selftext ?? '')) continue;
+      const mapped = mapRedditPost(
+        { ...d, permalink: d.permalink ?? `/r/${d.subreddit}/comments/${d.id}` },
+        `${label} subreddit:${subreddit}`,
+        options.jobId,
+        seen,
+      );
+      if (mapped) posts.push(mapped);
+    }
   }
 
   return posts;
@@ -247,22 +295,19 @@ async function searchArcticShift(
 ): Promise<ResearchPost[]> {
   const seen = new Set<string>();
   const posts: ResearchPost[] = [];
-  const queryText = keywordsFromQuery(query);
   const explicitSub = parseSubreddit(query);
+  const subreddits = explicitSub ? [explicitSub] : REDDIT_SUBREDDITS.map((s) => s.toLowerCase());
+  // Broad queries: hit a few high-signal subs, not the whole list every time
+  const limit = explicitSub ? 1 : Math.min(4, options.maxPages + 1);
 
-  const subreddits = explicitSub ? [explicitSub] : REDDIT_SUBREDDITS;
-
-  for (const sub of subreddits.slice(0, options.maxPages + 2)) {
+  for (const sub of subreddits.slice(0, limit)) {
     try {
-      const found = await searchArcticShiftSubreddit(sub, queryText || 'wallet problem', options, seen);
+      const found = await searchArcticShiftSubreddit(sub, query, options, seen);
       posts.push(...found);
-    } catch (err) {
-      // Skip overloaded subreddits silently; surface only total failure
-      if (posts.length === 0 && sub === subreddits[subreddits.length - 1]) {
-        throw err;
-      }
+    } catch {
+      // continue other subs
     }
-    await sleep(options.delayMs);
+    await sleep(Math.min(options.delayMs, 800));
   }
 
   return posts;
@@ -289,5 +334,5 @@ export async function searchRedditSubreddit(
   options: { timeRange: 'year' | 'month' | 'week'; delayMs: number; jobId?: string },
 ): Promise<ResearchPost[]> {
   const seen = new Set<string>();
-  return searchArcticShiftSubreddit(subreddit, keyword, options, seen);
+  return searchArcticShiftSubreddit(subreddit.toLowerCase(), keyword, options, seen);
 }

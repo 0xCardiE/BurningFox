@@ -60,6 +60,17 @@ export function toggleQuery(id: string, enabled: boolean) {
   return api(`/queries/${id}`, { method: 'PATCH', body: JSON.stringify({ enabled }) });
 }
 
+export async function saveXSession(authToken: string, ct0: string) {
+  return api<{ ok: boolean; message: string }>('/x/session', {
+    method: 'POST',
+    body: JSON.stringify({ authToken, ct0 }),
+  });
+}
+
+export async function clearXSession() {
+  return api<{ ok: boolean }>('/x/session', { method: 'DELETE' });
+}
+
 export async function fetchExport(format: 'markdown' | 'json', rating = 'useful'): Promise<string> {
   const res = await fetch(`${BASE}/export?format=${format}&rating=${rating}`);
   if (!res.ok) throw new Error(await res.text());

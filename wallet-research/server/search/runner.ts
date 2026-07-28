@@ -3,7 +3,7 @@ import { createJob, getJob, loadData, updateJob, upsertPosts } from '../storage.
 import type { SearchJob, Source } from '../types.js';
 import { searchGoogle, searchGoogleCse } from './google.js';
 import { searchReddit } from './reddit.js';
-import { searchX } from './x.js';
+import { hasXSession, searchX } from './x.js';
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -44,11 +44,12 @@ export async function runSearchJob(jobId: string): Promise<void> {
   // Bonus Reddit subreddit scans
   if (job.sources.includes('reddit')) {
     for (const sub of REDDIT_SUBREDDITS.slice(0, 5)) {
+      const subLower = sub.toLowerCase();
       steps.push({
-        label: `r/${sub} scan`,
+        label: `r/${subLower} scan`,
         source: 'reddit',
-        query: `wallet (problem OR help OR frustrating) subreddit:${sub}`,
-        queryId: `sub-${sub.toLowerCase()}`,
+        query: `wallet (problem OR help OR frustrating) subreddit:${subLower}`,
+        queryId: `sub-${subLower}`,
       });
     }
     if (hasDevQueries) {
@@ -57,7 +58,7 @@ export async function runSearchJob(jobId: string): Promise<void> {
           label: `r/${sub} dev scan`,
           source: 'reddit',
           query: `(MetaMask OR wallet OR wagmi OR WalletConnect) (error OR integrate OR broken) subreddit:${sub}`,
-          queryId: `dev-${sub.toLowerCase()}`,
+          queryId: `dev-${sub}`,
         });
       }
     }
@@ -79,14 +80,22 @@ export async function runSearchJob(jobId: string): Promise<void> {
   let postsFound = 0;
   const errors: string[] = [];
 
-  for (let i = 0; i < steps.length; i++) {
-    const step = steps[i];
+  if (job.sources.includes('x') && !hasXSession()) {
+    errors.push('X skipped: no session. Run: cd wallet-research && npm run x:login');
+  }
+
+  const runnableSteps = job.sources.includes('x') && !hasXSession()
+    ? steps.filter((s) => s.source !== 'x')
+    : steps;
+
+  for (let i = 0; i < runnableSteps.length; i++) {
+    const step = runnableSteps[i];
     const current = await getJob(jobId);
     if (current?.status === 'cancelled') return;
 
     await updateJob(jobId, {
       progress: {
-        totalSteps: steps.length,
+        totalSteps: runnableSteps.length,
         completedSteps: i,
         currentStep: `${step.source}: ${step.label}`,
         postsFound,
@@ -143,11 +152,11 @@ export async function runSearchJob(jobId: string): Promise<void> {
   }
 
   await updateJob(jobId, {
-    status: errors.length === steps.length ? 'failed' : 'completed',
+    status: errors.length > 0 && runnableSteps.length === 0 ? 'failed' : errors.length === runnableSteps.length ? 'failed' : 'completed',
     finishedAt: new Date().toISOString(),
     progress: {
-      totalSteps: steps.length,
-      completedSteps: steps.length,
+      totalSteps: runnableSteps.length,
+      completedSteps: runnableSteps.length,
       postsFound,
       errors,
     },

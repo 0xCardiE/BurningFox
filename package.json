@@ -10,7 +10,11 @@
     "build:watch": "vite build --watch",
     "preview": "vite preview",
     "icons": "node scripts/generate-extension-icons.mjs",
-    "update-chain-dex-ranks": "node scripts/fetch-defillama-chain-dex-volume.mjs"
+    "update-chain-dex-ranks": "node scripts/fetch-defillama-chain-dex-volume.mjs",
+    "wallet-research": "npm run dev --prefix wallet-research",
+    "wallet-research:x-login": "npm run x:login --prefix wallet-research",
+    "wallet-research:x-setup": "npm run x:setup --prefix wallet-research",
+    "wallet-research:x-cookies": "npm run x:cookies --prefix wallet-research"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",

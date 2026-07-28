@@ -10,6 +10,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "x:login": "tsx server/scripts/x-login.ts",
+    "x:cookies": "tsx server/scripts/x-cookies.ts",
+    "x:setup": "playwright install chromium",
     "search": "tsx server/scripts/run-search.ts"
   },
   "dependencies": {

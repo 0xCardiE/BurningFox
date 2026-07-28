@@ -11,6 +11,7 @@ import {
   toggleQuery,
   updatePost,
   fetchExport,
+  saveXSession,
   type AppData,
   type Category,
   type Rating,
@@ -44,6 +45,9 @@ export default function App() {
   const [sources, setSources] = useState<Source[]>(['reddit', 'google']);
   const [timeRange, setTimeRange] = useState<'year' | 'month' | 'week'>('year');
   const [exportMsg, setExportMsg] = useState('');
+  const [xAuthToken, setXAuthToken] = useState('');
+  const [xCt0, setXCt0] = useState('');
+  const [xMsg, setXMsg] = useState('');
 
   const refreshPosts = useCallback(async () => {
     const params: Record<string, string> = { sort };
@@ -132,6 +136,21 @@ export default function App() {
     a.download = `wallet-pain-${rating}.${format === 'json' ? 'json' : 'md'}`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function handleSaveXSession() {
+    try {
+      await saveXSession(xAuthToken, xCt0);
+      setXAuthToken('');
+      setXCt0('');
+      setXMsg('X session saved — you can enable X in searches');
+      const h = await fetchHealth();
+      setHealth(h);
+      setTimeout(() => setXMsg(''), 5000);
+    } catch {
+      setXMsg('Failed to save session — check auth_token and ct0');
+      setTimeout(() => setXMsg(''), 5000);
+    }
   }
 
   const progressPct =
@@ -238,6 +257,31 @@ export default function App() {
             <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10 }}>
               Runs slowly with delays between requests to reduce rate limits. Expect several minutes for a full batch.
             </p>
+          </div>
+
+          <div className="panel" style={{ marginBottom: 16 }}>
+            <h2>X search setup</h2>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 10px' }}>
+              Uses unofficial GraphQL via a saved login session (same as api-god-x / birdapi). Pick one method:
+            </p>
+            <ol style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 12px', paddingLeft: 18 }}>
+              <li>
+                Terminal: <code>npm run x:setup</code> then <code>npm run x:login</code>
+              </li>
+              <li>Or paste cookies from DevTools → x.com → auth_token + ct0</li>
+            </ol>
+            <div className="field">
+              <label>auth_token</label>
+              <input value={xAuthToken} onChange={(e) => setXAuthToken(e.target.value)} placeholder="Paste auth_token cookie" />
+            </div>
+            <div className="field">
+              <label>ct0</label>
+              <input value={xCt0} onChange={(e) => setXCt0(e.target.value)} placeholder="Paste ct0 cookie" />
+            </div>
+            <button className="btn primary small" disabled={!xAuthToken || !xCt0} onClick={() => void handleSaveXSession()}>
+              Save X session
+            </button>
+            {xMsg && <p style={{ fontSize: 12, color: 'var(--ok)', marginTop: 8, marginBottom: 0 }}>{xMsg}</p>}
           </div>
 
           <div className="panel" style={{ marginBottom: 16 }}>

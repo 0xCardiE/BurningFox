@@ -51,18 +51,29 @@ export GOOGLE_CX=your_search_engine_id
 
 ### X / Twitter (optional, requires login)
 
-X blocks anonymous search. This app uses **Playwright** with a saved browser session (same approach as tools like api-god-x).
+X blocks anonymous search. This app uses **Playwright + saved session** to intercept the same internal GraphQL search the X website uses (same approach as api-god-x / birdapi). No paid X API key — but you must be logged in.
 
-One-time setup:
+**Method A — browser login (easiest):**
 
 ```bash
-npx playwright install chromium
-npm run x:login
+cd wallet-research
+npm run x:setup      # install Chromium once
+npm run x:login      # log in, press Enter when done
 ```
 
-Log in to X in the browser window, then press **Enter** in the terminal. Session is saved to `data/x-session.json`.
+From repo root: `npm run wallet-research:x-setup` then `npm run wallet-research:x-login`
 
-Then enable **X** in the UI when running a search.
+**Method B — paste cookies (no browser script):**
+
+1. Open x.com while logged in → DevTools → Application → Cookies
+2. Copy `auth_token` and `ct0`
+3. Paste in the UI **X search setup** panel, or run:
+
+```bash
+X_AUTH_TOKEN=... X_CT0=... npm run x:cookies
+```
+
+Session saved to `data/x-session.json`. Then enable **X** in the UI when searching.
 
 > Use a secondary X account if you're worried about automation flags.
 

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { SESSION_FILE } from './search/x.js';
 import { createAndStartJob } from './search/runner.js';
 import { postsToJson, postsToMarkdown } from './export.js';
+import { saveXSession } from './search/x-session.js';
 import { loadData, saveData, updatePost } from './storage.js';
 import type { Rating, Source } from './types.js';
 
@@ -147,6 +148,32 @@ app.get('/api/export', async (req, res) => {
 
   const markdown = postsToMarkdown(posts, true);
   res.type('text/markdown').send(markdown);
+});
+
+app.post('/api/x/session', async (req, res) => {
+  const { authToken, ct0 } = req.body as { authToken?: string; ct0?: string };
+  if (!authToken || !ct0) {
+    res.status(400).json({ error: 'authToken and ct0 are required' });
+    return;
+  }
+  try {
+    const path = await saveXSession(authToken, ct0);
+    res.json({ ok: true, path, message: 'X session saved' });
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.delete('/api/x/session', async (_req, res) => {
+  const { unlink } = await import('node:fs/promises');
+  const { fileURLToPath } = await import('node:url');
+  const { SESSION_FILE } = await import('./search/x.js');
+  try {
+    await unlink(fileURLToPath(SESSION_FILE));
+    res.json({ ok: true });
+  } catch {
+    res.json({ ok: true, message: 'No session to delete' });
+  }
 });
 
 app.listen(PORT, () => {

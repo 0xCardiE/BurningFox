@@ -10,8 +10,8 @@ const DEFAULT_DATA: AppData = {
   jobs: [],
   queries: DEFAULT_QUERIES,
   settings: {
-    delayMs: 2500,
-    maxPagesPerQuery: 3,
+    delayMs: 1000,
+    maxPagesPerQuery: 2,
   },
 };
 

@@ -13,6 +13,99 @@ interface GoogleSearchOptions {
   jobId?: string;
 }
 
+const UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+function isDiscussionUrl(url: string): boolean {
+  const u = url.toLowerCase();
+  return (
+    u.includes('reddit.com') ||
+    u.includes('stackoverflow.com') ||
+    u.includes('stackexchange.com') ||
+    u.includes('news.ycombinator.com') ||
+    u.includes('github.com/') ||
+    u.includes('dev.to') ||
+    u.includes('medium.com') ||
+    u.includes('x.com/') ||
+    u.includes('twitter.com/')
+  );
+}
+
+function hasPainLanguage(title: string, snippet: string): boolean {
+  const text = `${title} ${snippet}`.toLowerCase();
+  return [
+    'frustrat', 'confus', 'problem', 'issue', 'error', 'fail', 'stuck', 'hate',
+    'broken', "can't", 'cannot', "doesn't", 'wrong', 'lost', 'wish', 'workaround',
+    'help', 'why is', 'not working', 'unable', 'annoying', 'sucks', 'terrible',
+  ].some((s) => text.includes(s));
+}
+
+function isWalletRelevant(title: string, snippet: string): boolean {
+  const text = `${title} ${snippet}`.toLowerCase();
+  return [
+    'wallet', 'metamask', 'phantom', 'crypto', 'ethereum', 'bitcoin', 'solana',
+    'seed phrase', 'recovery phrase', 'ledger', 'trezor', 'defi', 'web3', 'gas fee',
+    'token', 'blockchain', 'swap', 'bridge', 'dapp',
+    'wagmi', 'viem', 'ethers', 'walletconnect', 'hardhat', 'foundry', 'rpc', 'chainid',
+  ].some((k) => text.includes(k));
+}
+
+function toPost(
+  title: string,
+  url: string,
+  snippet: string,
+  query: string,
+  jobId?: string,
+): ResearchPost {
+  const { categories, primaryCategory } = categorizeText(title, snippet);
+  return {
+    id: postKey('google', url),
+    source: 'google',
+    title,
+    snippet,
+    url,
+    query,
+    categories,
+    primaryCategory,
+    rating: 'unrated',
+    notes: '',
+    tags: painScore(title, snippet) >= 2 ? ['high-pain'] : [],
+    fetchedAt: new Date().toISOString(),
+    jobId,
+  };
+}
+
+async function searchBingRss(query: string, jobId?: string): Promise<ResearchPost[]> {
+  // Prefer discussion sites so we don't just get product landing pages
+  const q = query.includes('site:')
+    ? query
+    : `${query} (site:reddit.com OR site:stackoverflow.com OR site:news.ycombinator.com OR site:dev.to)`;
+
+  const url = `https://www.bing.com/search?q=${encodeURIComponent(q)}&format=rss`;
+  const res = await fetch(url, { headers: { 'User-Agent': UA, Accept: 'application/rss+xml, text/xml, */*' } });
+  if (!res.ok) throw new Error(`Bing RSS failed (${res.status})`);
+  const xml = await res.text();
+  const $ = cheerio.load(xml, { xmlMode: true });
+  const posts: ResearchPost[] = [];
+  const seen = new Set<string>();
+
+  $('item').each((_, el) => {
+    const title = $(el).find('title').first().text().trim();
+    const link = $(el).find('link').first().text().trim();
+    const snippet = $(el).find('description').first().text().trim();
+    if (!title || !link.startsWith('http')) return;
+    if (!isWalletRelevant(title, snippet)) return;
+    // Prefer discussion threads; skip marketing/download pages
+    if (!isDiscussionUrl(link) && !hasPainLanguage(title, snippet)) return;
+    const id = postKey('google', link);
+    if (seen.has(id)) return;
+    seen.add(id);
+    posts.push(toPost(title, link, snippet.slice(0, 400), query, jobId));
+  });
+
+  return posts;
+}
+
 async function fetchDuckDuckGoPage(query: string, offset: number): Promise<string> {
   const body = new URLSearchParams({
     q: query,
@@ -25,8 +118,7 @@ async function fetchDuckDuckGoPage(query: string, offset: number): Promise<strin
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
       Accept: 'text/html',
-      'User-Agent':
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'User-Agent': UA,
     },
     body,
   });
@@ -37,7 +129,7 @@ async function fetchDuckDuckGoPage(query: string, offset: number): Promise<strin
   return res.text();
 }
 
-function extractResults(html: string): Array<{ title: string; url: string; snippet: string }> {
+function extractDdgResults(html: string): Array<{ title: string; url: string; snippet: string }> {
   const $ = cheerio.load(html);
   const results: Array<{ title: string; url: string; snippet: string }> = [];
 
@@ -64,32 +156,7 @@ function extractResults(html: string): Array<{ title: string; url: string; snipp
   return results;
 }
 
-function isRelevantWalletUrl(url: string): boolean {
-  const u = url.toLowerCase();
-  return (
-    u.includes('reddit.com') ||
-    u.includes('x.com') ||
-    u.includes('twitter.com') ||
-    u.includes('medium.com') ||
-    u.includes('stackoverflow.com') ||
-    u.includes('github.com') ||
-    u.includes('trustpilot') ||
-    u.includes('producthunt') ||
-    u.includes('news.ycombinator.com')
-  );
-}
-
-function isWalletRelevant(title: string, snippet: string): boolean {
-  const text = `${title} ${snippet}`.toLowerCase();
-  return [
-    'wallet', 'metamask', 'phantom', 'crypto', 'ethereum', 'bitcoin', 'solana',
-    'seed phrase', 'recovery phrase', 'ledger', 'trezor', 'defi', 'web3', 'gas fee',
-    'token', 'blockchain', 'swap', 'bridge', 'dapp',
-    'wagmi', 'viem', 'ethers', 'walletconnect', 'hardhat', 'foundry', 'rpc', 'chainid',
-  ].some((k) => text.includes(k));
-}
-
-export async function searchGoogle(
+async function searchDuckDuckGo(
   query: string,
   options: GoogleSearchOptions,
 ): Promise<ResearchPost[]> {
@@ -97,33 +164,16 @@ export async function searchGoogle(
   const seen = new Set<string>();
 
   for (let page = 0; page < options.maxPages; page++) {
-    const offset = page * 30;
-    const html = await fetchDuckDuckGoPage(query, offset);
-    const results = extractResults(html);
+    const html = await fetchDuckDuckGoPage(query, page * 30);
+    const results = extractDdgResults(html);
 
     for (const r of results) {
-      if (!isRelevantWalletUrl(r.url)) continue;
+      if (!isDiscussionUrl(r.url)) continue;
       if (!isWalletRelevant(r.title, r.snippet)) continue;
       const id = postKey('google', r.url);
       if (seen.has(id)) continue;
       seen.add(id);
-
-      const { categories, primaryCategory } = categorizeText(r.title, r.snippet);
-      posts.push({
-        id,
-        source: 'google',
-        title: r.title,
-        snippet: r.snippet,
-        url: r.url,
-        query,
-        categories,
-        primaryCategory,
-        rating: 'unrated',
-        notes: '',
-        tags: painScore(r.title, r.snippet) >= 2 ? ['high-pain'] : [],
-        fetchedAt: new Date().toISOString(),
-        jobId: options.jobId,
-      });
+      posts.push(toPost(r.title, r.url, r.snippet, query, options.jobId));
     }
 
     if (results.length < 5) break;
@@ -131,6 +181,43 @@ export async function searchGoogle(
   }
 
   return posts;
+}
+
+export async function searchGoogle(
+  query: string,
+  options: GoogleSearchOptions,
+): Promise<ResearchPost[]> {
+  const byId = new Map<string, ResearchPost>();
+
+  try {
+    for (const p of await searchBingRss(query, options.jobId)) {
+      byId.set(p.id, p);
+    }
+  } catch {
+    // fall through
+  }
+
+  // DuckDuckGo often blocks bots — try anyway as supplement
+  try {
+    for (const p of await searchDuckDuckGo(query, { ...options, maxPages: 1 })) {
+      byId.set(p.id, p);
+    }
+  } catch {
+    // ignore
+  }
+
+  if (byId.size === 0) {
+    // Last resort: simpler Bing query without site: filters
+    try {
+      for (const p of await searchBingRss(`${query} metamask wallet reddit`, options.jobId)) {
+        byId.set(p.id, p);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return [...byId.values()];
 }
 
 /** Optional Google Custom Search when GOOGLE_API_KEY + GOOGLE_CX are set */
@@ -161,23 +248,7 @@ export async function searchGoogleCse(
       const id = postKey('google', item.link);
       if (seen.has(id)) continue;
       seen.add(id);
-
-      const { categories, primaryCategory } = categorizeText(item.title, item.snippet);
-      posts.push({
-        id,
-        source: 'google',
-        title: item.title,
-        snippet: item.snippet,
-        url: item.link,
-        query,
-        categories,
-        primaryCategory,
-        rating: 'unrated',
-        notes: '',
-        tags: [],
-        fetchedAt: new Date().toISOString(),
-        jobId: options.jobId,
-      });
+      posts.push(toPost(item.title, item.link, item.snippet, query, options.jobId));
     }
 
     if (!json.items?.length) break;
