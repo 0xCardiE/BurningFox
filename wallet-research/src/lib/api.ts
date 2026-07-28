@@ -71,7 +71,7 @@ export async function clearXSession() {
   return api<{ ok: boolean }>('/x/session', { method: 'DELETE' });
 }
 
-export async function fetchExport(format: 'markdown' | 'json', rating = 'useful'): Promise<string> {
+export async function fetchExport(format: 'markdown' | 'json' | 'compact', rating = 'all'): Promise<string> {
   const res = await fetch(`${BASE}/export?format=${format}&rating=${rating}`);
   if (!res.ok) throw new Error(await res.text());
   return format === 'json' ? JSON.stringify(await res.json(), null, 2) : res.text();

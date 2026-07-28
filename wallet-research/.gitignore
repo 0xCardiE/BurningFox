@@ -2,6 +2,7 @@ node_modules/
 dist/
 data/*.json
 !data/.gitkeep
+exports/
 .env
 .env*.local
 playwright/.auth/

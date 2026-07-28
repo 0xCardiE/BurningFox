@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { SESSION_FILE } from './search/x.js';
 import { createAndStartJob } from './search/runner.js';
-import { postsToJson, postsToMarkdown } from './export.js';
+import { postsToCompactMarkdown, postsToJson, postsToMarkdown } from './export.js';
 import { saveXSession } from './search/x-session.js';
 import { loadData, saveData, updatePost } from './storage.js';
 import type { Rating, Source } from './types.js';
@@ -132,8 +132,8 @@ app.patch('/api/queries/:id', async (req, res) => {
 
 app.get('/api/export', async (req, res) => {
   const data = await loadData();
-  const rating = String(req.query.rating ?? 'useful') as Rating | 'all' | 'high-pain';
-  const format = String(req.query.format ?? 'markdown');
+  const rating = String(req.query.rating ?? 'all') as Rating | 'all' | 'high-pain';
+  const format = String(req.query.format ?? 'compact');
 
   let posts = [...data.posts];
   if (rating === 'useful') posts = posts.filter((p) => p.rating === 'useful');
@@ -146,7 +146,8 @@ app.get('/api/export', async (req, res) => {
     return;
   }
 
-  const markdown = postsToMarkdown(posts, true);
+  const markdown =
+    format === 'markdown' ? postsToMarkdown(posts, true) : postsToCompactMarkdown(posts, true);
   res.type('text/markdown').send(markdown);
 });
 

@@ -1,113 +1,72 @@
 # Wallet Pain Research
 
-Local research tool for mining crypto wallet complaints from **Reddit**, **Google/web**, and **X**.
+Source crypto wallet complaints from **Reddit**, **Google/web**, and **X** into a local corpus, auto-tag them, then export for LLM analysis.
 
-Results and your ratings are stored locally in `wallet-research/data/store.json`.
+No manual approval needed. The database is just a file you paste into Cursor / ChatGPT.
 
 ## Quick start
 
 ```bash
 cd wallet-research
 npm install
-npm run dev
+npm run dev          # UI at http://localhost:5174
 ```
 
-Open http://localhost:5174
+Or CLI-only:
 
-The UI talks to the API on http://localhost:3847 (proxied in dev).
+```bash
+npm run search                          # Reddit + Google
+npm run search -- --sources reddit,x    # include X (needs session)
+npm run export                          # writes exports/wallet-pain-*.md
+```
 
-## What it does
+## Workflow
 
-1. Runs a **batch search** across enabled query templates (wallet confusion, wrong network, seed phrase, gas fees, etc.)
-2. Fetches results **slowly** with configurable delays to reduce rate limiting
-3. **Auto-categorizes** posts (seed recovery, gas fees, UI confusion, lost funds, etc.)
-4. Lets you mark posts as **useful / not useful** and add notes — all saved locally
+1. **Collect** — batch search (UI or `npm run search`)
+2. **Inspect** — browse / filter posts in the UI (optional)
+3. **Export** — copy corpus or `npm run export`, paste into an LLM
+4. **Analyze** — ask the LLM for top pain themes & product opportunities
+
+Local DB: `data/store.json`  
+Exports: `exports/` (gitignored)
 
 ## Sources
 
-### Reddit (works out of the box)
+| Source | Needs | Notes |
+|--------|-------|-------|
+| Reddit | nothing | Arctic Shift archive API |
+| Google/web | nothing | Bing RSS (+ DuckDuckGo fallback) |
+| X | login session | unofficial GraphQL via saved cookies |
 
-Uses [Arctic Shift](https://arctic-shift.photon-reddit.com) — a free historical Reddit archive API — to search wallet-related subreddits up to ~1 year back. No API key required.
+### X session (optional)
 
-**Optional:** set official Reddit OAuth for live search (may require app approval):
+You need cookies named **`auth_token`** and **`ct0`** — not `__cf_bm` / `_cuid`.
 
-```bash
-export REDDIT_CLIENT_ID=your_app_id
-export REDDIT_CLIENT_SECRET=your_secret
-```
-
-Create an app at https://www.reddit.com/prefs/apps (script type).
-
-### Google / web (works out of the box)
-
-Uses DuckDuckGo HTML search by default, biased toward Reddit/X/help forums.
-
-**Optional:** set Google Custom Search for better results (100 free queries/day):
-
-```bash
-export GOOGLE_API_KEY=your_key
-export GOOGLE_CX=your_search_engine_id
-```
-
-### X / Twitter (optional, requires login)
-
-X blocks anonymous search. This app uses **Playwright + saved session** to intercept the same internal GraphQL search the X website uses (same approach as api-god-x / birdapi). No paid X API key — but you must be logged in.
-
-**Method A — browser login (easiest):**
-
-```bash
-cd wallet-research
-npm run x:setup      # install Chromium once
-npm run x:login      # log in, press Enter when done
-```
-
-From repo root: `npm run wallet-research:x-setup` then `npm run wallet-research:x-login`
-
-**Method B — paste cookies (no browser script):**
-
-1. Open x.com while logged in → DevTools → Application → Cookies
-2. Copy `auth_token` and `ct0`
-3. Paste in the UI **X search setup** panel, or run:
+1. Open **x.com** in regular Chrome while **logged in**
+2. DevTools → Application → Cookies → `https://x.com`
+3. **Scroll** the list until you see `auth_token` and `ct0`
+4. Paste them in the UI, or:
 
 ```bash
 X_AUTH_TOKEN=... X_CT0=... npm run x:cookies
 ```
 
-Session saved to `data/x-session.json`. Then enable **X** in the UI when searching.
+Browser login alternative: `npm run x:setup && npm run x:login`
 
-> Use a secondary X account if you're worried about automation flags.
-
-## CLI batch search
+## CLI reference
 
 ```bash
-npm run search
+# Search
+npm run search -- --sources reddit,google,x --time year
+npm run search -- -q reddit-metamask,reddit-ethdev
+
+# Export for LLM
+npm run export                              # compact markdown → exports/
+npm run export -- --format json -o exports/corpus.json
+npm run export -- --filter high-pain
+npm run export -- --filter developer_integration --limit 100
 ```
 
-Runs the same job runner headlessly (uses default enabled queries).
+## Customize queries
 
-## Data
-
-| File | Purpose |
-|------|---------|
-| `data/store.json` | All posts, jobs, ratings, notes |
-| `data/x-session.json` | X login session (gitignored) |
-
-## Customizing queries
-
-Edit `server/queries.ts` to add/remove search templates. Toggle them on/off in the UI sidebar.
-
-## Architecture
-
-```
-wallet-research/
-  server/           Express API + search runners
-  src/              React UI
-  data/             Local JSON storage
-```
-
-## Limitations
-
-- Reddit/X may rate-limit or block aggressive use — keep default delays
-- X internal GraphQL can break when X changes endpoints; re-run `npm run x:login` if search fails
-- Categorization is keyword-based, not LLM — good enough for triage, not perfect taxonomy
-- Google via DuckDuckGo is approximate; use Google CSE for production research
+Edit `server/queries.ts` or toggle queries in the UI sidebar.
