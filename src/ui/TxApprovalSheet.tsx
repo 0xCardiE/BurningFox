@@ -4,11 +4,16 @@ import { getUnlockedAccount } from '../lib/accountSession';
 import {
   approvalTitle,
   buildApprovalDetailSections,
+  mergeFunctionSignatureLookup,
   mergeGasPreview,
+  needsFunctionSignatureLookup,
+  selectorFromData,
   type ApprovalDetailField,
   type ApprovalDetailSection,
+  type FunctionSignatureLookup,
   type TxGasPreview,
 } from '../lib/approvalDetails';
+import { lookupFunctionSelectors } from '../lib/fourByteDirectory';
 import { chainById } from '../lib/chainCatalog';
 import { chainJsonRpcCall } from '../lib/ethereum';
 import {
@@ -131,6 +136,7 @@ function ApprovalContent({ pending }: { pending: PendingApproval }) {
   const walletAddress = account ? getAddress(account.address) : undefined;
   const chain = chainById(pending.chainId);
   const [gasPreview, setGasPreview] = useState<TxGasPreview | null>(null);
+  const [sigLookup, setSigLookup] = useState<FunctionSignatureLookup | null>(null);
 
   const sections = useMemo(() => {
     let built = buildApprovalDetailSections(
@@ -141,8 +147,11 @@ function ApprovalContent({ pending }: { pending: PendingApproval }) {
     if (gasPreview) {
       built = mergeGasPreview(built, gasPreview, pending.chainId);
     }
+    if (sigLookup) {
+      built = mergeFunctionSignatureLookup(built, sigLookup);
+    }
     return built;
-  }, [pending.request, pending.chainId, walletAddress, gasPreview]);
+  }, [pending.request, pending.chainId, walletAddress, gasPreview, sigLookup]);
 
   useEffect(() => {
     if (pending.request.method !== 'eth_sendTransaction' || !walletAddress) {
@@ -158,6 +167,29 @@ function ApprovalContent({ pending }: { pending: PendingApproval }) {
       cancelled = true;
     };
   }, [pending.id, pending.request, pending.chainId, walletAddress]);
+
+  useEffect(() => {
+    if (!needsFunctionSignatureLookup(pending.request)) {
+      setSigLookup(null);
+      return;
+    }
+    const tx = (pending.request.params?.[0] ?? {}) as Record<string, unknown>;
+    const data = typeof tx.data === 'string' ? tx.data : undefined;
+    const selector = data ? selectorFromData(data) : undefined;
+    if (!selector) {
+      setSigLookup(null);
+      return;
+    }
+
+    setSigLookup({ status: 'loading' });
+    let cancelled = false;
+    void lookupFunctionSelectors(selector).then(signatures => {
+      if (!cancelled) setSigLookup({ status: 'done', signatures });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [pending.id, pending.request]);
 
   const hostname = pending.summary.hostname;
 

@@ -40,7 +40,6 @@ const KNOWN_SELECTORS: Record<string, string> = {
   '0x23b872dd': 'transferFrom(address,address,uint256)',
   '0x42842e0e': 'safeTransferFrom(address,address,uint256)',
   '0xb88d4fde': 'safeTransferFrom(address,address,uint256,bytes)',
-  '0x49290c1c': 'unknown (0x49290c1c)',
   '0x3593564c': 'execute(bytes,bytes[],uint256)',
   '0x5ae401dc': 'multicall(uint256,bytes[])',
   '0xac9650d8': 'multicall(bytes[])',
@@ -130,9 +129,21 @@ function formatGweiHex(v: unknown): string | undefined {
   return `${formatGwei(n)} gwei`;
 }
 
-function selectorFromData(data: unknown): string | undefined {
+export function selectorFromData(data: unknown): string | undefined {
   if (typeof data !== 'string' || !isHex(data) || data.length < 10) return undefined;
   return data.slice(0, 10).toLowerCase();
+}
+
+export function needsFunctionSignatureLookup(request: ProviderRequest): boolean {
+  if (request.method !== 'eth_sendTransaction') return false;
+  const tx = (request.params?.[0] ?? {}) as Record<string, unknown>;
+  const data = typeof tx.data === 'string' ? tx.data : undefined;
+  if (!data || data.length <= 10) return false;
+  const selector = selectorFromData(data);
+  if (!selector) return false;
+  if (decodeCalldata(data)) return false;
+  if (KNOWN_SELECTORS[selector]) return false;
+  return true;
 }
 
 function decodeCalldata(data: string): string | undefined {
@@ -391,6 +402,54 @@ export function buildApprovalDetailSections(
   }
 
   return typedDataSections(params, method);
+}
+
+export type FunctionSignatureLookup =
+  | { status: 'loading' }
+  | { status: 'done'; signatures: string[] };
+
+export function mergeFunctionSignatureLookup(
+  sections: ApprovalDetailSection[],
+  lookup: FunctionSignatureLookup | null,
+): ApprovalDetailSection[] {
+  if (!lookup) return sections;
+
+  const overview = sections.find(s => s.id === 'tx-overview');
+  if (!overview) return sections;
+
+  const likelyIdx = overview.fields.findIndex(f => f.label === 'Likely function');
+  if (likelyIdx === -1) return sections;
+
+  const current = overview.fields[likelyIdx];
+  if (current.mono) return sections;
+
+  if (lookup.status === 'loading') {
+    const fields = [...overview.fields];
+    fields[likelyIdx] = { ...current, value: 'Looking up 4byte.directory…', warn: false };
+    return sections.map(s => (s.id === 'tx-overview' ? { ...s, fields } : s));
+  }
+
+  if (lookup.signatures.length === 0) return sections;
+
+  const fields = [...overview.fields];
+  fields[likelyIdx] = {
+    ...current,
+    value: lookup.signatures[0],
+    mono: true,
+    warn: false,
+  };
+
+  if (lookup.signatures.length > 1) {
+    fields.splice(
+      likelyIdx + 1,
+      0,
+      field('Other signatures (4byte.directory)', lookup.signatures.slice(1).join(', '), {
+        mono: true,
+      }),
+    );
+  }
+
+  return sections.map(s => (s.id === 'tx-overview' ? { ...s, fields } : s));
 }
 
 export function mergeGasPreview(
