@@ -1,5 +1,6 @@
 import { categorizeText, painScore } from '../categorize.js';
 import { REDDIT_SUBREDDITS } from '../queries.js';
+import { isWalletRelevant, WALLET_SEED_PREFERRED } from '../relevance.js';
 import { postKey } from '../storage.js';
 import type { ResearchPost } from '../types.js';
 
@@ -22,11 +23,15 @@ function parseSubreddit(query: string): string | null {
   return m ? m[1].toLowerCase() : null;
 }
 
-/** Arctic Shift keyword search only works with short terms — pick a few seeds */
+/**
+ * Arctic Shift only handles short terms. Prefer wallet anchors from the query;
+ * never fall back to bare pain words like "help" / "problem" alone.
+ */
 function seedKeywords(query: string): string[] {
   const stop = new Set([
     'or', 'and', 'the', 'a', 'an', 'to', 'for', 'of', 'in', 'on', 'with', 'from',
-    'crypto', 'wallet', 'wallets', 'site', 'reddit', 'com', 'stackoverflow',
+    'crypto', 'site', 'reddit', 'com', 'stackoverflow', 'problem', 'issue',
+    'help', 'error', 'failed', 'frustrating', 'confused', 'broken', 'hate',
   ]);
 
   const raw = query
@@ -36,14 +41,7 @@ function seedKeywords(query: string): string[] {
     .replace(/\bOR\b|\bAND\b/gi, ' ')
     .toLowerCase();
 
-  const preferred = [
-    'frustrating', 'confused', 'stuck', 'broken', 'error', 'failed', 'hate',
-    'seed', 'gas', 'approval', 'signing', 'bridge', 'swap', 'wagmi', 'viem',
-    'walletconnect', 'localhost', 'metamask', 'phantom', 'ledger', 'trezor',
-    'help', 'problem', 'issue', 'integrate', 'rpc', 'chainid',
-  ];
-
-  const found = preferred.filter((p) => raw.includes(p));
+  const found = WALLET_SEED_PREFERRED.filter((p) => raw.includes(p));
   if (found.length) return [...new Set(found)].slice(0, 4);
 
   const tokens = raw
@@ -51,17 +49,12 @@ function seedKeywords(query: string): string[] {
     .map((t) => t.trim())
     .filter((t) => t.length >= 4 && !stop.has(t));
 
-  return [...new Set(tokens)].slice(0, 3);
-}
-
-function looksPainful(title: string, body: string): boolean {
-  const text = `${title} ${body}`.toLowerCase();
-  const signals = [
-    'help', 'problem', 'issue', 'error', 'fail', 'stuck', 'confus', 'frustrat',
-    'hate', 'broken', "can't", 'cannot', "doesn't", 'doesnt', 'wrong', 'lost',
-    'wish', 'workaround', 'how do i', 'why is', 'not working', 'unable',
-  ];
-  return signals.some((s) => text.includes(s));
+  const seeds = [...new Set(tokens)].slice(0, 3);
+  // Always keep at least one wallet-ish seed so Arctic never searches "help" alone
+  if (!seeds.some((s) => (WALLET_SEED_PREFERRED as readonly string[]).includes(s))) {
+    seeds.unshift('wallet');
+  }
+  return seeds.slice(0, 4);
 }
 
 interface RedditOAuthToken {
@@ -187,6 +180,8 @@ function mapRedditPost(
   seen.add(id);
 
   const snippet = (d.selftext || d.title).slice(0, 400);
+  if (!isWalletRelevant(d.title, snippet)) return null;
+
   const { categories, primaryCategory } = categorizeText(d.title, snippet);
 
   return {
@@ -245,8 +240,8 @@ async function searchArcticShiftSubreddit(
   const posts: ResearchPost[] = [];
   const label = queryText || 'wallet pain';
 
-  // 1) Try short keyword searches (Arctic only handles short terms well)
-  const seedsToTry = (seeds.length ? seeds : ['help']).slice(0, 2);
+  // 1) Short keyword searches (wallet anchors only — Arctic can't do boolean)
+  const seedsToTry = (seeds.length ? seeds : ['wallet', 'metamask']).slice(0, 2);
   for (const seed of seedsToTry) {
     const rows = await arcticFetch(subreddit, {
       query: seed,
@@ -255,7 +250,6 @@ async function searchArcticShiftSubreddit(
       sort: 'desc',
     });
     for (const d of rows) {
-      if (!looksPainful(d.title, d.selftext ?? '')) continue;
       const mapped = mapRedditPost(
         { ...d, permalink: d.permalink ?? `/r/${d.subreddit}/comments/${d.id}` },
         `${label} subreddit:${subreddit}`,
@@ -267,7 +261,7 @@ async function searchArcticShiftSubreddit(
     await sleep(400);
   }
 
-  // 2) Fallback: recent posts in the sub, filter client-side for pain language
+  // 2) Fallback: recent posts, still gated by isWalletRelevant inside mapRedditPost
   if (posts.length < 8) {
     const recent = await arcticFetch(subreddit, {
       after,
@@ -275,7 +269,6 @@ async function searchArcticShiftSubreddit(
       sort: 'desc',
     });
     for (const d of recent) {
-      if (!looksPainful(d.title, d.selftext ?? '')) continue;
       const mapped = mapRedditPost(
         { ...d, permalink: d.permalink ?? `/r/${d.subreddit}/comments/${d.id}` },
         `${label} subreddit:${subreddit}`,

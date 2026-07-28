@@ -45,6 +45,8 @@ export interface SearchQuery {
   id: string;
   label: string;
   query: string;
+  /** Optional X-optimized query; when set, used instead of simplified `query` on X */
+  xQuery?: string;
   sources: Source[];
   enabled: boolean;
 }

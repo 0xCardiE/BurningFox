@@ -1,5 +1,6 @@
 import * as cheerio from 'cheerio';
 import { categorizeText, painScore } from '../categorize.js';
+import { isWalletRelevant } from '../relevance.js';
 import { postKey } from '../storage.js';
 import type { ResearchPost } from '../types.js';
 
@@ -31,32 +32,14 @@ function isDiscussionUrl(url: string): boolean {
   );
 }
 
-function hasPainLanguage(title: string, snippet: string): boolean {
-  const text = `${title} ${snippet}`.toLowerCase();
-  return [
-    'frustrat', 'confus', 'problem', 'issue', 'error', 'fail', 'stuck', 'hate',
-    'broken', "can't", 'cannot', "doesn't", 'wrong', 'lost', 'wish', 'workaround',
-    'help', 'why is', 'not working', 'unable', 'annoying', 'sucks', 'terrible',
-  ].some((s) => text.includes(s));
-}
-
-function isWalletRelevant(title: string, snippet: string): boolean {
-  const text = `${title} ${snippet}`.toLowerCase();
-  return [
-    'wallet', 'metamask', 'phantom', 'crypto', 'ethereum', 'bitcoin', 'solana',
-    'seed phrase', 'recovery phrase', 'ledger', 'trezor', 'defi', 'web3', 'gas fee',
-    'token', 'blockchain', 'swap', 'bridge', 'dapp',
-    'wagmi', 'viem', 'ethers', 'walletconnect', 'hardhat', 'foundry', 'rpc', 'chainid',
-  ].some((k) => text.includes(k));
-}
-
 function toPost(
   title: string,
   url: string,
   snippet: string,
   query: string,
   jobId?: string,
-): ResearchPost {
+): ResearchPost | null {
+  if (!isWalletRelevant(title, snippet)) return null;
   const { categories, primaryCategory } = categorizeText(title, snippet);
   return {
     id: postKey('google', url),
@@ -94,13 +77,13 @@ async function searchBingRss(query: string, jobId?: string): Promise<ResearchPos
     const link = $(el).find('link').first().text().trim();
     const snippet = $(el).find('description').first().text().trim();
     if (!title || !link.startsWith('http')) return;
-    if (!isWalletRelevant(title, snippet)) return;
-    // Prefer discussion threads; skip marketing/download pages
-    if (!isDiscussionUrl(link) && !hasPainLanguage(title, snippet)) return;
+    if (!isDiscussionUrl(link)) return;
     const id = postKey('google', link);
     if (seen.has(id)) return;
+    const post = toPost(title, link, snippet.slice(0, 400), query, jobId);
+    if (!post) return;
     seen.add(id);
-    posts.push(toPost(title, link, snippet.slice(0, 400), query, jobId));
+    posts.push(post);
   });
 
   return posts;
@@ -169,11 +152,12 @@ async function searchDuckDuckGo(
 
     for (const r of results) {
       if (!isDiscussionUrl(r.url)) continue;
-      if (!isWalletRelevant(r.title, r.snippet)) continue;
       const id = postKey('google', r.url);
       if (seen.has(id)) continue;
+      const post = toPost(r.title, r.url, r.snippet, query, options.jobId);
+      if (!post) continue;
       seen.add(id);
-      posts.push(toPost(r.title, r.url, r.snippet, query, options.jobId));
+      posts.push(post);
     }
 
     if (results.length < 5) break;
@@ -247,8 +231,10 @@ export async function searchGoogleCse(
     for (const item of json.items ?? []) {
       const id = postKey('google', item.link);
       if (seen.has(id)) continue;
+      const post = toPost(item.title, item.link, item.snippet, query, options.jobId);
+      if (!post) continue;
       seen.add(id);
-      posts.push(toPost(item.title, item.link, item.snippet, query, options.jobId));
+      posts.push(post);
     }
 
     if (!json.items?.length) break;

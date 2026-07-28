@@ -24,16 +24,17 @@ async function ensureDataDir() {
 
 function mergeQueries(stored: SearchQuery[] | undefined) {
   if (!stored?.length) return DEFAULT_QUERIES;
-  const byId = new Map(DEFAULT_QUERIES.map((q) => [q.id, q]));
+  const storedById = new Map(stored.map((q) => [q.id, q]));
+  // Refresh query text / sources / xQuery from code; keep user's enabled toggle
+  const merged = DEFAULT_QUERIES.map((def) => {
+    const s = storedById.get(def.id);
+    if (!s) return def;
+    return { ...def, enabled: s.enabled };
+  });
   for (const q of stored) {
-    const existing = byId.get(q.id);
-    if (existing) {
-      byId.set(q.id, { ...existing, ...q });
-    } else {
-      byId.set(q.id, q);
-    }
+    if (!DEFAULT_QUERIES.some((d) => d.id === q.id)) merged.push(q);
   }
-  return [...byId.values()];
+  return merged;
 }
 
 export async function loadData(): Promise<AppData> {

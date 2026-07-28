@@ -132,7 +132,7 @@ app.patch('/api/queries/:id', async (req, res) => {
 
 app.get('/api/export', async (req, res) => {
   const data = await loadData();
-  const rating = String(req.query.rating ?? 'all') as Rating | 'all' | 'high-pain';
+  const rating = String(req.query.rating ?? 'all') as Rating | 'all' | 'high-pain' | 'relevant';
   const format = String(req.query.format ?? 'compact');
 
   let posts = [...data.posts];
@@ -140,6 +140,10 @@ app.get('/api/export', async (req, res) => {
   else if (rating === 'not_useful') posts = posts.filter((p) => p.rating === 'not_useful');
   else if (rating === 'unrated') posts = posts.filter((p) => p.rating === 'unrated');
   else if (rating === 'high-pain') posts = posts.filter((p) => p.tags.includes('high-pain'));
+  else if (rating === 'relevant') {
+    const { isWalletRelevant } = await import('./relevance.js');
+    posts = posts.filter((p) => isWalletRelevant(p.title, p.snippet));
+  }
 
   if (format === 'json') {
     res.json(postsToJson(posts));

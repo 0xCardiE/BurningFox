@@ -2,13 +2,14 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { postsToCompactMarkdown, postsToJson, postsToMarkdown } from '../export.js';
+import { isWalletRelevant } from '../relevance.js';
 import { loadData } from '../storage.js';
 import type { ResearchPost } from '../types.js';
 
 function parseArgs(argv: string[]) {
   const out: {
     format: 'markdown' | 'compact' | 'json';
-    filter: 'all' | 'high-pain' | CategoryFilter;
+    filter: 'all' | 'high-pain' | 'relevant' | CategoryFilter;
     limit?: number;
     file?: string;
   } = { format: 'compact', filter: 'all' };
@@ -24,12 +25,13 @@ function parseArgs(argv: string[]) {
 
 Options:
   --format, -f   markdown | compact | json   (default: compact)
-  --filter       all | high-pain | <category> (default: all)
+  --filter       all | high-pain | relevant | <category> (default: all)
   --limit N      max posts to include
   --out, -o      output file path (default: exports/wallet-pain-<timestamp>.<ext>)
 
 Examples:
   npm run export
+  npm run export -- --filter relevant
   npm run export -- --format json --out exports/corpus.json
   npm run export -- --filter high-pain --format compact
   npm run export -- --filter developer_integration --limit 80
@@ -45,6 +47,9 @@ type CategoryFilter = string;
 function filterPosts(posts: ResearchPost[], filter: string): ResearchPost[] {
   if (filter === 'all') return posts;
   if (filter === 'high-pain') return posts.filter((p) => p.tags.includes('high-pain'));
+  if (filter === 'relevant') {
+    return posts.filter((p) => isWalletRelevant(p.title, p.snippet));
+  }
   return posts.filter((p) => p.primaryCategory === filter || p.categories.includes(filter as never));
 }
 
@@ -83,6 +88,9 @@ async function main() {
 
   console.log(`Exported ${posts.length} posts → ${outPath}`);
   console.log(`Filter: ${opts.filter} · Format: ${opts.format}`);
+  if (opts.filter === 'all') {
+    console.log('Tip: npm run export -- --filter relevant  (or npm run prune) to drop noise.');
+  }
   console.log('Paste that file into Cursor/ChatGPT, or open it and copy.');
 }
 

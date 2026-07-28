@@ -62,11 +62,23 @@ npm run search -- -q reddit-metamask,reddit-ethdev
 
 # Export for LLM
 npm run export                              # compact markdown → exports/
+npm run export -- --filter relevant         # wallet-relevant posts only
 npm run export -- --format json -o exports/corpus.json
 npm run export -- --filter high-pain
 npm run export -- --filter developer_integration --limit 100
+
+# Drop noise already in the store
+npm run prune -- --dry-run                  # preview
+npm run prune                               # write store.json
 ```
+
+## Noise controls
+
+New searches apply a **relevance gate** (wallet/crypto anchor + pain language) before saving.
+X queries use dedicated `xQuery` strings instead of stripped Google boolean soup.
+Arctic Shift seeds prefer wallet terms (`metamask`, `wallet`, …) never bare `help`/`problem`.
 
 ## Customize queries
 
 Edit `server/queries.ts` or toggle queries in the UI sidebar.
+Optional per-query `xQuery` is used when searching X.

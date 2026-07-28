@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { categorizeText, painScore } from '../categorize.js';
+import { isWalletRelevant } from '../relevance.js';
 import { postKey } from '../storage.js';
 import type { ResearchPost } from '../types.js';
 
@@ -130,7 +131,9 @@ export async function searchXWithPlaywright(
 
   await browser.close();
 
-  return collected.map((t) => {
+  return collected
+    .filter((t) => isWalletRelevant(t.text.slice(0, 120), t.text.slice(0, 400)))
+    .map((t) => {
     const title = t.text.slice(0, 120) + (t.text.length > 120 ? '…' : '');
     const snippet = t.text.slice(0, 400);
     const { categories, primaryCategory } = categorizeText(title, snippet);

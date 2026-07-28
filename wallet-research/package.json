@@ -13,7 +13,8 @@
     "x:cookies": "tsx server/scripts/x-cookies.ts",
     "x:setup": "playwright install chromium",
     "search": "tsx server/scripts/run-search.ts",
-    "export": "tsx server/scripts/export.ts"
+    "export": "tsx server/scripts/export.ts",
+    "prune": "tsx server/scripts/prune.ts"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",
