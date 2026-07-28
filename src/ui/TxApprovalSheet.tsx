@@ -656,6 +656,7 @@ export function TxApprovalSheet({ settings }: { settings: AppSettings }) {
     setBusy(false);
     if (!res.ok) {
       setErr(res.error ?? 'Could not resolve request');
+      setPending(null);
       return;
     }
     await refresh();

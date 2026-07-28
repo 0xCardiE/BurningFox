@@ -4,6 +4,7 @@ import { getWalletBalances } from '@lifi/sdk';
 import type { ExtendedChain, LiFiStep, Token } from '@lifi/types';
 import { getUnlockedAccount } from '../lib/accountSession';
 import { summarizeApiError } from '../lib/errors';
+import { reportDevError } from '../lib/devErrorLog';
 import {
   chainLabel,
   fetchGasTopUpQuote,
@@ -348,7 +349,19 @@ export function GasStationView({ settings }: { settings: AppSettings }) {
         crossChain: result.crossChain,
       });
     } catch (e) {
-      setExecLog(summarizeApiError(e));
+      const msg = summarizeApiError(e);
+      setExecLog(msg);
+      reportDevError({
+        source: 'gas-station',
+        title: 'Gas top-up failed',
+        err: e,
+        context: {
+          destChainId,
+          sourceChainId,
+          sourceToken: sourceToken?.symbol,
+          gasAmount: gasAmountStr,
+        },
+      });
     } finally {
       setExecBusy(false);
     }

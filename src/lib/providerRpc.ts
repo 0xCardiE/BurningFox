@@ -23,6 +23,8 @@ import {
   type AppSettings,
 } from './storageState';
 import { connectOrigin, isOriginConnected } from './dappConnections';
+import { chainJsonRpcCall } from './ethereum';
+import { reportProviderRpcFailure } from './devErrorReport';
 import { isSignMethod, queueApprovalRequest } from './pendingApprovals';
 import { parseChainIdParam, providerError, toHexChainId } from '../provider/types';
 import type { ProviderRequest, ProviderResponse } from '../provider/types';
@@ -71,6 +73,25 @@ export type ProviderRpcResult = ProviderResponse & {
   switchedChainId?: number;
 };
 
+/** Read / simulation RPC forwarded to the active chain's RPC (for dapp previews). */
+const PROXY_RPC_METHODS = new Set([
+  'eth_call',
+  'eth_estimateGas',
+  'eth_getBalance',
+  'eth_getTransactionCount',
+  'eth_getCode',
+  'eth_getStorageAt',
+  'eth_blockNumber',
+  'eth_gasPrice',
+  'eth_maxPriorityFeePerGas',
+  'eth_feeHistory',
+  'eth_getBlockByNumber',
+  'eth_getBlockByHash',
+  'eth_getTransactionByHash',
+  'eth_getTransactionReceipt',
+  'eth_getLogs',
+]);
+
 export async function handleProviderRpc(
   pk: `0x${string}` | null,
   request: ProviderRequest,
@@ -78,9 +99,10 @@ export async function handleProviderRpc(
   opts?: { tabId?: number; onApprovalQueued?: () => void },
 ): Promise<ProviderRpcResult> {
   const { id, method, params = [] } = request;
+  let chainId = 1;
   try {
     const { settings } = await loadPersisted();
-    const chainId = effectiveActiveChainId(settings);
+    chainId = effectiveActiveChainId(settings);
 
     if (method === 'eth_chainId') {
       return { id, ok: true, result: toHexChainId(chainId) };
@@ -199,25 +221,52 @@ export async function handleProviderRpc(
 
     if (isSignMethod(method)) {
       if (effectiveTxConfirmMode(settings) === 'normal') {
-        return queueApprovalRequest({
+        const approval = await queueApprovalRequest({
           request,
           origin,
           tabId: opts?.tabId,
           chainId,
           onQueued: opts?.onApprovalQueued,
         });
+        if (!approval.ok && approval.error) {
+          reportProviderRpcFailure({
+            method,
+            code: approval.error.code,
+            message: approval.error.message,
+            origin,
+            chainId,
+            params,
+          });
+        }
+        return approval;
       }
       const result = await executeSignRequest(pk, chainId, method, params);
       return { id, ok: true, result };
     }
 
+    if (PROXY_RPC_METHODS.has(method)) {
+      const result = await chainJsonRpcCall(chainId, method, params);
+      return { id, ok: true, result };
+    }
+
     throw Object.assign(new Error(`Unsupported method: ${method}`), { code: 4200 });
   } catch (err) {
-    const e = err as Error & { code?: number };
+    const e = err as Error & { code?: number; data?: unknown };
+    const code = e.code ?? 4001;
+    const message = e.message ?? String(err);
+    reportProviderRpcFailure({
+      method,
+      code,
+      message,
+      origin,
+      chainId,
+      params,
+      rpcData: e.data,
+    });
     return {
       id,
       ok: false,
-      error: providerError(e.code ?? 4001, e.message ?? String(err)),
+      error: providerError(code, message),
     };
   }
 }

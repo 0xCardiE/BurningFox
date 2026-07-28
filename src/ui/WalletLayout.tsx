@@ -6,6 +6,7 @@ import { NetworkSelector } from './NetworkSelector';
 import { DappConnectionBar } from './DappConnectionBar';
 import { TxApprovalSheet } from './TxApprovalSheet';
 import { NetworkDoctorSheet } from './NetworkDoctorSheet';
+import { DevErrorPanel } from './DevErrorPanel';
 
 export type WalletMainTab = 'assets' | 'history' | 'tools';
 
@@ -105,6 +106,7 @@ export function WalletLayout({
 
       <div className="screen-body bfox-body bfox-body--main">{children}</div>
 
+      <DevErrorPanel />
       <DappConnectionBar settings={settings} onSaved={onSaved} />
       <TxApprovalSheet settings={settings} />
       <NetworkDoctorSheet settings={settings} onSaved={onSaved} />

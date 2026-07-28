@@ -9,6 +9,7 @@ import { effectiveSlippageRatio } from '../lib/storageState';
 import { sortEvmChainIds, sortExtendedChains } from '../lib/chainPopularity';
 import { loadEvmMainnetChains } from '../lib/lifiBootstrap';
 import { summarizeApiError } from '../lib/errors';
+import { reportDevError } from '../lib/devErrorLog';
 import {
   ensureErc20Allowance,
   sendTransactionRequest,
@@ -1220,8 +1221,20 @@ export function SwapView({
         }
       })();
     } catch (e) {
-      setExecLog(summarizeApiError(e));
+      const msg = summarizeApiError(e);
+      setExecLog(msg);
       setExecTx(null);
+      reportDevError({
+        source: 'swap',
+        title: 'Swap failed',
+        err: e,
+        context: {
+          fromChainId: quote?.action.fromChainId,
+          toChainId: quote?.action.toChainId,
+          fromSymbol: quote?.action.fromToken.symbol,
+          toSymbol: quote?.action.toToken.symbol,
+        },
+      });
     } finally {
       setExecBusy(false);
     }

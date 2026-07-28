@@ -30,6 +30,7 @@ import {
 } from './lib/storageState';
 import type { ProviderRequest, ProviderResponse } from './provider/types';
 import { toHexChainId } from './provider/types';
+import { reportInternalFailure } from './lib/devErrorReport';
 import { getAddress } from 'viem';
 
 const POPUP_PATH = 'index.html';
@@ -407,10 +408,17 @@ chrome.runtime.onMessage.addListener(
           const { switchedChainId: _switched, ...response } = res;
           sendResponse(response);
         } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          reportInternalFailure({
+            source: 'provider',
+            title: 'Provider handler crashed',
+            err: e,
+            context: { method: message.request.method, origin: message.origin },
+          });
           sendResponse({
             id: message.request.id,
             ok: false,
-            error: { code: 4001, message: e instanceof Error ? e.message : String(e) },
+            error: { code: 4001, message: msg },
           } satisfies ProviderResponse);
         }
       })();
@@ -457,12 +465,25 @@ chrome.runtime.onMessage.addListener(
             sendResponse({ ok: true });
           } catch (e) {
             const err = e as Error & { code?: number };
+            const msg = err.message ?? String(e);
+            reportInternalFailure({
+              source: 'background',
+              title: 'Sign / send failed',
+              err: e,
+              context: {
+                method: entry.request.method,
+                chainId: entry.chainId,
+                origin: entry.origin,
+                gasOverrides: message.gasOverrides,
+                params: entry.request.params,
+              },
+            });
             entry.resolve({
               id,
               ok: false,
-              error: { code: err.code ?? 4001, message: err.message ?? String(e) },
+              error: { code: err.code ?? 4001, message: msg },
             });
-            sendResponse({ ok: false, error: err.message ?? String(e) });
+            sendResponse({ ok: false, error: msg });
           }
         } catch (e) {
           sendResponse({ ok: false, error: e instanceof Error ? e.message : String(e) });
