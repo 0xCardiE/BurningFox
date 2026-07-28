@@ -408,6 +408,33 @@ export type FunctionSignatureLookup =
   | { status: 'loading' }
   | { status: 'done'; signatures: string[] };
 
+export function resolveLikelyFunctionSignature(
+  request: ProviderRequest,
+  sigLookup: FunctionSignatureLookup | null,
+): string | undefined {
+  if (request.method !== 'eth_sendTransaction') return undefined;
+  const tx = (request.params?.[0] ?? {}) as Record<string, unknown>;
+  const data = typeof tx.data === 'string' ? tx.data : undefined;
+  if (!data || data.length <= 10) return undefined;
+
+  const decoded = decodeCalldata(data);
+  const selector = selectorFromData(data);
+  if (selector && KNOWN_SELECTORS[selector]) return KNOWN_SELECTORS[selector];
+
+  if (sigLookup?.status === 'done' && sigLookup.signatures[0]) {
+    return sigLookup.signatures[0];
+  }
+
+  return undefined;
+}
+
+export function txContractAddress(request: ProviderRequest): `0x${string}` | undefined {
+  if (request.method !== 'eth_sendTransaction') return undefined;
+  const tx = (request.params?.[0] ?? {}) as Record<string, unknown>;
+  if (typeof tx.to !== 'string' || !isAddress(tx.to)) return undefined;
+  return getAddress(tx.to);
+}
+
 export function mergeFunctionSignatureLookup(
   sections: ApprovalDetailSection[],
   lookup: FunctionSignatureLookup | null,

@@ -1,4 +1,5 @@
 import type { PendingApproval } from './pendingApprovals';
+import type { GasOverrideInput } from './gasOverrides';
 
 function sendMessage<T>(msg: unknown): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -27,12 +28,14 @@ export async function fetchPendingApprovals(): Promise<PendingApproval[]> {
 export async function resolvePendingApproval(
   id: string,
   approved: boolean,
+  gasOverrides?: GasOverrideInput,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = (await sendMessage<{ ok: boolean; error?: string }>({
       type: 'RESOLVE_PENDING_APPROVAL',
       id,
       approved,
+      gasOverrides,
     })) as { ok: boolean; error?: string };
     return res ?? { ok: false, error: 'No response' };
   } catch (e) {

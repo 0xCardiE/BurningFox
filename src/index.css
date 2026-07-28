@@ -2331,6 +2331,140 @@ button.bfox-dapp-bar__btn--disconnect:hover:not(:disabled) {
   font-size: 12px;
 }
 
+.bfox-tx-approval__gas-fee {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+}
+
+.bfox-tx-approval__gas-fee-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bfox-tx-approval__gas-fee-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.bfox-tx-approval__gas-fee-value {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.bfox-tx-approval__gas-fee-custom {
+  margin: 0;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--purple);
+  cursor: pointer;
+}
+
+.bfox-tx-approval__gas-fee-custom:hover {
+  background: var(--accent-soft-2);
+}
+
+.bfox-tx-approval__gas-fee-custom--active {
+  background: var(--accent-soft);
+  border-color: var(--purple);
+  color: var(--purple-deep);
+}
+
+.bfox-tx-approval__gas-fee-panel {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bfox-tx-approval__gas-fee-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.bfox-tx-approval__gas-fee-field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bfox-tx-approval__gas-tip {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  flex-shrink: 0;
+}
+
+.bfox-tx-approval__gas-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 220px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: #1f2937;
+  color: #f9fafb;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.35;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s ease;
+  z-index: 2;
+}
+
+.bfox-tx-approval__gas-tip:hover::after,
+.bfox-tx-approval__gas-tip:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+}
+
+.bfox-tx-approval__gas-fee-field input {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+.bfox-tx-approval__gas-fee-err {
+  margin: 0;
+  font-size: 11px;
+}
+
 .bfox-tx-approval__dev-note {
   margin: 0 0 10px;
   padding: 8px 10px;
@@ -2491,6 +2625,87 @@ button.bfox-dapp-bar__btn--disconnect:hover:not(:disabled) {
 
 .bfox-tx-approval__approve:hover:not(:disabled) {
   background: var(--purple-deep);
+}
+
+.bfox-tx-approval__fn-source {
+  margin: 2px 0 0;
+  padding: 0 12px 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.bfox-tx-approval__fn-source-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 10px 0 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bfox-tx-approval__fn-source-head:hover {
+  color: var(--purple-deep);
+}
+
+.bfox-tx-approval__fn-source-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.bfox-tx-approval__fn-source-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.bfox-tx-approval__fn-source-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--purple-deep);
+  text-decoration: none;
+}
+
+.bfox-tx-approval__fn-source-link:hover {
+  text-decoration: underline;
+}
+
+.bfox-tx-approval__fn-source-body {
+  margin-top: 8px;
+}
+
+.bfox-tx-approval__fn-source-meta {
+  margin: 0 0 6px;
+  font-size: 11px;
+}
+
+.bfox-tx-approval__fn-source-pre {
+  margin: 0;
+  padding: 10px;
+  max-height: 220px;
+  overflow: auto;
+  border-radius: var(--radius-md);
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 10px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 

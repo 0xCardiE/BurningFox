@@ -255,7 +255,7 @@ type Msg =
   | { type: 'CONNECT_ACTIVE_TAB' }
   | { type: 'DISCONNECT_ACTIVE_TAB' }
   | { type: 'GET_PENDING_APPROVALS' }
-  | { type: 'RESOLVE_PENDING_APPROVAL'; id: string; approved: boolean };
+  | { type: 'RESOLVE_PENDING_APPROVAL'; id: string; approved: boolean; gasOverrides?: import('./lib/gasOverrides').GasOverrideInput };
 
 async function sessionPrivateKey(): Promise<`0x${string}` | null> {
   await maybeAutoLockExpired();
@@ -451,6 +451,7 @@ chrome.runtime.onMessage.addListener(
               entry.chainId,
               entry.request.method,
               entry.request.params ?? [],
+              message.gasOverrides,
             );
             entry.resolve({ id, ok: true, result });
             sendResponse({ ok: true });

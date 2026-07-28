@@ -1,5 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getAddress } from 'viem';
+import {
+  computeAutoGasEstimate,
+  computeDisplayFeeEstimate,
+  formatFeeEstimate,
+  gweiToInput,
+  type GasOverrideInput,
+  validateGasOverrides,
+} from '../lib/gasOverrides';
 import { getUnlockedAccount } from '../lib/accountSession';
 import {
   approvalTitle,
@@ -7,15 +15,20 @@ import {
   mergeFunctionSignatureLookup,
   mergeGasPreview,
   needsFunctionSignatureLookup,
+  resolveLikelyFunctionSignature,
   selectorFromData,
+  txContractAddress,
   type ApprovalDetailField,
   type ApprovalDetailSection,
   type FunctionSignatureLookup,
   type TxGasPreview,
 } from '../lib/approvalDetails';
+import { fetchFunctionSourceFromExplorer, type FunctionSourceResult } from '../lib/explorerContractSource';
 import { lookupFunctionSelectors } from '../lib/fourByteDirectory';
+import { addressExplorerLink } from '../lib/tokenApprovals';
 import { chainById } from '../lib/chainCatalog';
 import { chainJsonRpcCall } from '../lib/ethereum';
+import type { AppSettings } from '../lib/storageState';
 import {
   fetchPendingApprovals,
   resolvePendingApproval,
@@ -51,6 +64,173 @@ function DetailField({ f }: { f: ApprovalDetailField }) {
         {f.copyable ? <CopyBtn text={f.value} /> : null}
       </dd>
     </div>
+  );
+}
+
+function ExternalLinkIcon() {
+  return (
+    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" strokeLinecap="round" />
+      <polyline points="15 3 21 3 21 9" strokeLinecap="round" />
+      <line x1="10" y1="14" x2="21" y2="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function explorerLabel(chainId: number): string {
+  const url = chainById(chainId)?.blockExplorerUrls[0] ?? '';
+  try {
+    const host = new URL(url).hostname;
+    if (host.includes('etherscan')) return 'Etherscan';
+    if (host.includes('basescan')) return 'Basescan';
+    if (host.includes('arbiscan')) return 'Arbiscan';
+    if (host.includes('polygonscan')) return 'Polygonscan';
+    if (host.includes('bscscan')) return 'BscScan';
+    return host.replace(/^www\./, '').split('.')[0] ?? 'Explorer';
+  } catch {
+    return 'Explorer';
+  }
+}
+
+function FunctionSourceBlock({
+  chainId,
+  contractAddress,
+  functionSignature,
+  explorerApiKey,
+}: {
+  chainId: number;
+  contractAddress: `0x${string}`;
+  functionSignature: string;
+  explorerApiKey?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [result, setResult] = useState<FunctionSourceResult | null>(null);
+
+  useEffect(() => {
+    setResult(null);
+    let cancelled = false;
+    void fetchFunctionSourceFromExplorer({
+      chainId,
+      contractAddress,
+      functionSignature,
+      explorerApiKey,
+    }).then(r => {
+      if (!cancelled) setResult(r);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [chainId, contractAddress, functionSignature, explorerApiKey]);
+
+  const explorerName = explorerLabel(chainId);
+  const contractUrl = addressExplorerLink(chainId, contractAddress);
+
+  return (
+    <div className="bfox-tx-approval__fn-source">
+      <button
+        type="button"
+        className="bfox-tx-approval__fn-source-head"
+        aria-expanded={open}
+        onClick={() => setOpen(v => !v)}
+      >
+        <span className="bfox-tx-approval__fn-source-title">
+          Function source
+          <span className="bfox-tx-approval__chev" aria-hidden>
+            {open ? '▾' : '▸'}
+          </span>
+        </span>
+        {contractUrl ? (
+          <span className="bfox-tx-approval__fn-source-actions">
+            <a
+              className="bfox-tx-approval__fn-source-link"
+              href={contractUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+            >
+              {explorerName}
+              <ExternalLinkIcon />
+            </a>
+          </span>
+        ) : null}
+      </button>
+      {open ? (
+        <div className="bfox-tx-approval__fn-source-body">
+          {!result ? (
+            <p className="bfox-tx-approval__fn-source-meta muted">Loading verified source…</p>
+          ) : result.functionSource ? (
+            <>
+              {result.contractName ? (
+                <p className="bfox-tx-approval__fn-source-meta muted">
+                  {result.contractName}
+                  {result.sourceFileHint ? ` · ${result.sourceFileHint.replace('// File: ', '')}` : ''}
+                </p>
+              ) : null}
+              <pre className="bfox-tx-approval__fn-source-pre">{result.functionSource}</pre>
+            </>
+          ) : (
+            <p className="bfox-tx-approval__fn-source-meta muted">{result.error ?? 'Source unavailable.'}</p>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function OverviewSection({
+  section,
+  chainId,
+  functionSignature,
+  contractAddress,
+  explorerApiKey,
+}: {
+  section: ApprovalDetailSection;
+  chainId: number;
+  functionSignature?: string;
+  contractAddress?: `0x${string}`;
+  explorerApiKey?: string;
+}) {
+  const [open, setOpen] = useState(section.defaultOpen ?? false);
+  const likelyIdx = section.fields.findIndex(f => f.label === 'Likely function');
+  const showSource = likelyIdx !== -1 && !!functionSignature && !!contractAddress;
+
+  return (
+    <section className="bfox-tx-approval__section">
+      <button
+        type="button"
+        className="bfox-tx-approval__section-head"
+        aria-expanded={open}
+        onClick={() => setOpen(v => !v)}
+      >
+        <span>{section.title}</span>
+        <span className="bfox-tx-approval__chev" aria-hidden>
+          {open ? '▾' : '▸'}
+        </span>
+      </button>
+      {open ? (
+        showSource ? (
+          <>
+            <dl className="bfox-tx-approval__fields">
+              {section.fields.slice(0, likelyIdx + 1).map(field => (
+                <DetailField key={`${section.id}-${field.label}`} f={field} />
+              ))}
+            </dl>
+            <FunctionSourceBlock
+              chainId={chainId}
+              contractAddress={contractAddress}
+              functionSignature={functionSignature}
+              explorerApiKey={explorerApiKey}
+            />
+          </>
+        ) : (
+          <dl className="bfox-tx-approval__fields">
+            {section.fields.map(field => (
+              <DetailField key={`${section.id}-${field.label}`} f={field} />
+            ))}
+          </dl>
+        )
+      ) : null}
+    </section>
   );
 }
 
@@ -131,12 +311,165 @@ async function fetchTxGasPreview(
   return preview;
 }
 
-function ApprovalContent({ pending }: { pending: PendingApproval }) {
+const DEFAULT_GAS_OVERRIDES: GasOverrideInput = { mode: 'auto' };
+
+const GAS_FIELD_TIPS = {
+  maxFee:
+    'The most you will pay per unit of gas. Actual fee is usually lower; any unused amount is refunded.',
+  priorityFee:
+    'A tip to validators for faster inclusion. Raise it if the transaction is stuck in the mempool.',
+  gasLimit:
+    'Maximum computation units for this transaction. Too low and it reverts; you only pay for gas actually used.',
+} as const;
+
+function GasFieldLabel({ label, tip }: { label: string; tip: string }) {
+  return (
+    <span className="bfox-tx-approval__gas-fee-field-label">
+      {label}
+      <button
+        type="button"
+        className="bfox-tx-approval__gas-tip"
+        aria-label={`About ${label}`}
+        data-tip={tip}
+      >
+        ?
+      </button>
+    </span>
+  );
+}
+
+function GasFeeBar({
+  pending,
+  gasPreview,
+  overrides,
+  onOverridesChange,
+}: {
+  pending: PendingApproval;
+  gasPreview: TxGasPreview | null;
+  overrides: GasOverrideInput;
+  onOverridesChange: (next: GasOverrideInput) => void;
+}) {
+  const tx = (pending.request.params?.[0] ?? {}) as Record<string, unknown>;
+  const chain = chainById(pending.chainId);
+  const symbol = chain?.nativeCurrency.symbol ?? 'ETH';
+  const isCustom = overrides.mode === 'custom';
+
+  const autoEstimate = useMemo(
+    () => computeAutoGasEstimate(tx, gasPreview),
+    [tx, gasPreview],
+  );
+
+  const displayEstimate = useMemo(
+    () => computeDisplayFeeEstimate(overrides, autoEstimate),
+    [overrides, autoEstimate],
+  );
+
+  const validationErr = useMemo(() => validateGasOverrides(overrides), [overrides]);
+
+  function toggleCustom() {
+    if (isCustom) {
+      onOverridesChange({ mode: 'auto' });
+      return;
+    }
+    if (!autoEstimate) return;
+    onOverridesChange({
+      mode: 'custom',
+      maxFeeGwei: gweiToInput(autoEstimate.maxFeePerGas),
+      maxPriorityGwei: gweiToInput(autoEstimate.maxPriorityFeePerGas),
+      gasLimit: autoEstimate.gasLimitBuffered.toString(),
+    });
+  }
+
+  const feeLabel = displayEstimate
+    ? formatFeeEstimate(displayEstimate.totalWei, symbol)
+    : gasPreview?.error
+      ? 'Estimate unavailable'
+      : 'Estimating…';
+
+  const modeLabel = isCustom ? 'Custom' : 'Auto';
+
+  return (
+    <div className="bfox-tx-approval__gas-fee">
+      <div className="bfox-tx-approval__gas-fee-row">
+        <span className="bfox-tx-approval__gas-fee-label">Network fee</span>
+        <span className="bfox-tx-approval__gas-fee-value">
+          {feeLabel} · {modeLabel}
+        </span>
+        <button
+          type="button"
+          className={`bfox-tx-approval__gas-fee-custom${isCustom ? ' bfox-tx-approval__gas-fee-custom--active' : ''}`}
+          aria-pressed={isCustom}
+          onClick={() => toggleCustom()}
+        >
+          Custom
+        </button>
+      </div>
+
+      {isCustom ? (
+        <div className="bfox-tx-approval__gas-fee-panel">
+          <label className="bfox-tx-approval__gas-fee-field">
+            <GasFieldLabel label="Max fee (gwei)" tip={GAS_FIELD_TIPS.maxFee} />
+            <input
+              type="text"
+              inputMode="decimal"
+              value={overrides.maxFeeGwei ?? ''}
+              onChange={e =>
+                onOverridesChange({ ...overrides, maxFeeGwei: e.target.value })
+              }
+              placeholder={autoEstimate ? gweiToInput(autoEstimate.maxFeePerGas) : ''}
+            />
+          </label>
+          <label className="bfox-tx-approval__gas-fee-field">
+            <GasFieldLabel label="Priority fee (gwei)" tip={GAS_FIELD_TIPS.priorityFee} />
+            <input
+              type="text"
+              inputMode="decimal"
+              value={overrides.maxPriorityGwei ?? ''}
+              onChange={e =>
+                onOverridesChange({ ...overrides, maxPriorityGwei: e.target.value })
+              }
+              placeholder={
+                autoEstimate ? gweiToInput(autoEstimate.maxPriorityFeePerGas) : ''
+              }
+            />
+          </label>
+          <label className="bfox-tx-approval__gas-fee-field">
+            <GasFieldLabel label="Gas limit" tip={GAS_FIELD_TIPS.gasLimit} />
+            <input
+              type="text"
+              inputMode="numeric"
+              value={overrides.gasLimit ?? ''}
+              onChange={e =>
+                onOverridesChange({ ...overrides, gasLimit: e.target.value })
+              }
+              placeholder={autoEstimate?.gasLimitBuffered.toString()}
+            />
+          </label>
+
+          {validationErr ? <p className="error bfox-tx-approval__gas-fee-err">{validationErr}</p> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ApprovalContent({
+  pending,
+  settings,
+  gasOverrides,
+  onGasOverridesChange,
+}: {
+  pending: PendingApproval;
+  settings: AppSettings;
+  gasOverrides: GasOverrideInput;
+  onGasOverridesChange: (next: GasOverrideInput) => void;
+}) {
   const account = getUnlockedAccount();
   const walletAddress = account ? getAddress(account.address) : undefined;
   const chain = chainById(pending.chainId);
   const [gasPreview, setGasPreview] = useState<TxGasPreview | null>(null);
   const [sigLookup, setSigLookup] = useState<FunctionSignatureLookup | null>(null);
+  const explorerApiKey = settings.explorerApiKey?.trim();
 
   const sections = useMemo(() => {
     let built = buildApprovalDetailSections(
@@ -153,11 +486,28 @@ function ApprovalContent({ pending }: { pending: PendingApproval }) {
     return built;
   }, [pending.request, pending.chainId, walletAddress, gasPreview, sigLookup]);
 
+  const functionSignature = useMemo(
+    () => resolveLikelyFunctionSignature(pending.request, sigLookup),
+    [pending.request, sigLookup],
+  );
+  const contractAddress = useMemo(
+    () => txContractAddress(pending.request),
+    [pending.request],
+  );
+  const canShowSource = !!functionSignature && !!contractAddress;
+
+  const gasFetchedForRef = useRef<string | null>(null);
+  const sigLookupKeyRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (pending.request.method !== 'eth_sendTransaction' || !walletAddress) {
       setGasPreview(null);
+      gasFetchedForRef.current = null;
       return;
     }
+    if (gasFetchedForRef.current === pending.id) return;
+
+    gasFetchedForRef.current = pending.id;
     const tx = (pending.request.params?.[0] ?? {}) as Record<string, unknown>;
     let cancelled = false;
     void fetchTxGasPreview(pending.chainId, tx, walletAddress).then(p => {
@@ -166,11 +516,12 @@ function ApprovalContent({ pending }: { pending: PendingApproval }) {
     return () => {
       cancelled = true;
     };
-  }, [pending.id, pending.request, pending.chainId, walletAddress]);
+  }, [pending.id, pending.chainId, pending.request, walletAddress]);
 
   useEffect(() => {
     if (!needsFunctionSignatureLookup(pending.request)) {
       setSigLookup(null);
+      sigLookupKeyRef.current = null;
       return;
     }
     const tx = (pending.request.params?.[0] ?? {}) as Record<string, unknown>;
@@ -178,9 +529,14 @@ function ApprovalContent({ pending }: { pending: PendingApproval }) {
     const selector = data ? selectorFromData(data) : undefined;
     if (!selector) {
       setSigLookup(null);
+      sigLookupKeyRef.current = null;
       return;
     }
 
+    const lookupKey = `${pending.id}:${selector}`;
+    if (sigLookupKeyRef.current === lookupKey) return;
+
+    sigLookupKeyRef.current = lookupKey;
     setSigLookup({ status: 'loading' });
     let cancelled = false;
     void lookupFunctionSelectors(selector).then(signatures => {
@@ -210,45 +566,93 @@ function ApprovalContent({ pending }: { pending: PendingApproval }) {
           </p>
         ) : null}
 
+        {pending.request.method === 'eth_sendTransaction' ? (
+          <GasFeeBar
+            pending={pending}
+            gasPreview={gasPreview}
+            overrides={gasOverrides}
+            onOverridesChange={onGasOverridesChange}
+          />
+        ) : null}
+
         <p className="bfox-tx-approval__dev-note muted">
           Developer view — inspect gas, calldata, and raw RPC params before signing.
         </p>
 
         <div className="bfox-tx-approval__sections">
-          {sections.map(section => (
-            <DetailSection key={section.id} section={section} />
-          ))}
+          {sections.map(section =>
+            section.id === 'tx-overview' ? (
+              <OverviewSection
+                key={section.id}
+                section={section}
+                chainId={pending.chainId}
+                functionSignature={canShowSource ? functionSignature : undefined}
+                contractAddress={canShowSource ? contractAddress : undefined}
+                explorerApiKey={explorerApiKey}
+              />
+            ) : (
+              <DetailSection key={section.id} section={section} />
+            ),
+          )}
         </div>
       </div>
     </>
   );
 }
 
-export function TxApprovalSheet() {
+export function TxApprovalSheet({ settings }: { settings: AppSettings }) {
   const [pending, setPending] = useState<PendingApproval | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [gasOverrides, setGasOverrides] = useState<GasOverrideInput>(DEFAULT_GAS_OVERRIDES);
 
   const refresh = useCallback(async () => {
     const list = await fetchPendingApprovals();
-    setPending(list[0] ?? null);
+    const next = list[0] ?? null;
+    setPending(prev => {
+      if (next == null) return null;
+      if (prev?.id === next.id) return prev;
+      return next;
+    });
   }, []);
 
   useEffect(() => {
     void refresh();
-    const id = window.setInterval(() => void refresh(), 600);
+    const intervalMs = pending ? 5000 : 800;
+    const id = window.setInterval(() => void refresh(), intervalMs);
     return () => window.clearInterval(id);
-  }, [refresh]);
+  }, [pending?.id, refresh]);
+
+  useEffect(() => {
+    setGasOverrides(DEFAULT_GAS_OVERRIDES);
+  }, [pending?.id]);
+
+  const gasValidationErr = useMemo(
+    () => validateGasOverrides(gasOverrides),
+    [gasOverrides],
+  );
 
   if (!pending) return null;
 
   const title = approvalTitle(pending.request);
+  const confirmBlocked =
+    pending.request.method === 'eth_sendTransaction' &&
+    gasOverrides.mode === 'custom' &&
+    !!gasValidationErr;
 
   async function onDecision(approved: boolean) {
     if (!pending || busy) return;
+    if (approved && confirmBlocked) {
+      setErr(gasValidationErr);
+      return;
+    }
     setBusy(true);
     setErr(null);
-    const res = await resolvePendingApproval(pending.id, approved);
+    const res = await resolvePendingApproval(
+      pending.id,
+      approved,
+      approved && pending.request.method === 'eth_sendTransaction' ? gasOverrides : undefined,
+    );
     setBusy(false);
     if (!res.ok) {
       setErr(res.error ?? 'Could not resolve request');
@@ -272,7 +676,13 @@ export function TxApprovalSheet() {
           </h2>
         </div>
 
-        <ApprovalContent pending={pending} />
+        <ApprovalContent
+          key={pending.id}
+          pending={pending}
+          settings={settings}
+          gasOverrides={gasOverrides}
+          onGasOverridesChange={setGasOverrides}
+        />
 
         {err ? <p className="error bfox-tx-approval__err">{err}</p> : null}
 
@@ -288,7 +698,7 @@ export function TxApprovalSheet() {
           <button
             type="button"
             className="bfox-tx-approval__approve"
-            disabled={busy}
+            disabled={busy || confirmBlocked}
             onClick={() => void onDecision(true)}
           >
             {busy ? 'Confirming…' : 'Confirm'}

@@ -105,7 +105,7 @@ export function WalletLayout({
       <div className="screen-body bfox-body bfox-body--main">{children}</div>
 
       <DappConnectionBar settings={settings} onSaved={onSaved} />
-      <TxApprovalSheet />
+      <TxApprovalSheet settings={settings} />
     </div>
   );
 }

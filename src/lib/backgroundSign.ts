@@ -13,6 +13,7 @@ import {
 } from 'viem';
 import { ERC20_ABI } from './abis';
 import { chainJsonRpcCall } from './ethereum';
+import type { SignTxOptions } from './gasOverrides';
 
 export function addressFromPrivateKey(pk: `0x${string}`): `0x${string}` {
   return privateKeyToAccount(pk).address;
@@ -74,6 +75,7 @@ export async function signAndSendTransaction(
   pk: `0x${string}`,
   chainId: number,
   tx: TxInput,
+  opts?: SignTxOptions,
 ): Promise<Hex> {
   const account = privateKeyToAccount(pk);
   if (tx.from && getAddress(tx.from) !== account.address) {
@@ -92,7 +94,7 @@ export async function signAndSendTransaction(
         value: value ? `0x${value.toString(16)}` : '0x0',
       },
     ]).then(h => BigInt(h)));
-  const gasBuffered = (gasLimit * 125n) / 100n;
+  const gasBuffered = opts?.gasLimitFinal ?? (gasLimit * 125n) / 100n;
 
   const nonce =
     tx.nonce != null

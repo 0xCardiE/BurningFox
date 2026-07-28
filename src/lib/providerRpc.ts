@@ -14,6 +14,7 @@ import {
   signEip712,
   signPersonalMessage,
 } from './backgroundSign';
+import { applyGasOverrides, type GasOverrideInput } from './gasOverrides';
 import {
   effectiveActiveChainId,
   effectiveTxConfirmMode,
@@ -31,11 +32,13 @@ export async function executeSignRequest(
   chainId: number,
   method: string,
   params: unknown[],
+  gasOverrides?: GasOverrideInput,
 ): Promise<unknown> {
   if (method === 'eth_sendTransaction') {
     const tx = params[0] as Record<string, unknown>;
     if (!tx || typeof tx !== 'object') throw new Error('Invalid transaction');
-    return signAndSendTransaction(pk, chainId, tx as never);
+    const { tx: merged, signOpts } = applyGasOverrides(tx, gasOverrides);
+    return signAndSendTransaction(pk, chainId, merged as never, signOpts);
   }
 
   if (method === 'personal_sign' || method === 'eth_sign') {
