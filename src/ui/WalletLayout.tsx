@@ -6,11 +6,11 @@ import { NetworkSelector } from './NetworkSelector';
 import { DappConnectionBar } from './DappConnectionBar';
 import { TxApprovalSheet } from './TxApprovalSheet';
 
-export type WalletMainTab = 'assets' | 'swap' | 'tools';
+export type WalletMainTab = 'assets' | 'history' | 'tools';
 
 const TAB_LABELS: Record<WalletMainTab, string> = {
   assets: 'Assets',
-  swap: 'Swap',
+  history: 'History',
   tools: 'Tools',
 };
 

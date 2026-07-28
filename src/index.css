@@ -2999,6 +2999,40 @@ button.bfox-dd__option--on:hover {
   margin: 12px 0;
 }
 
+/* Gas Station (Tools) */
+.bfox-gas-station .bfox-dd {
+  margin-bottom: 10px;
+}
+
+.bfox-gas-quote {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.bfox-gas-quote__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.bfox-gas-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.bfox-gas-actions button {
+  flex: 1;
+}
+
 /* Transaction history (MetaMask-style) */
 .bfox-tx-history {
   padding-bottom: 8px;
@@ -3075,10 +3109,10 @@ button.bfox-dd__option--on:hover {
 
 .bfox-tx-history__item {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 10px 12px 12px;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: 0;
+  padding: 0;
   border-bottom: 1px solid var(--border);
 }
 
@@ -3090,8 +3124,37 @@ button.bfox-dd__option--on:hover {
   background: var(--accent-soft-2);
 }
 
+.bfox-tx-history__item--failed {
+  background: #fffbfb;
+}
+
+.bfox-tx-history__item--failed:hover {
+  background: #fef2f2;
+}
+
 .bfox-tx-history__item--failed .bfox-tx-history__title {
-  opacity: 0.7;
+  opacity: 0.85;
+}
+
+.bfox-tx-history__item--open {
+  background: var(--accent-soft-2);
+}
+
+.bfox-tx-history__row-btn {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 0;
+  padding: 12px 4px 12px 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  min-width: 0;
 }
 
 .bfox-tx-history__icon-wrap {
@@ -3224,16 +3287,162 @@ button.bfox-dd__option--on:hover {
   justify-content: center;
   width: 32px;
   height: 32px;
+  margin: 10px 8px 0 0;
   border-radius: var(--radius-md);
   color: var(--text-muted);
   text-decoration: none;
   flex-shrink: 0;
   transition: background 0.12s, color 0.12s;
+  grid-row: 1;
+  grid-column: 2;
 }
 
 .bfox-tx-history__explorer:hover {
   background: var(--accent-soft);
   color: var(--purple);
+}
+
+.bfox-tx-history__detail {
+  grid-column: 1 / -1;
+  padding: 0 12px 12px;
+  border-top: 1px dashed var(--border);
+}
+
+.bfox-tx-fail {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bfox-tx-fail--ok {
+  gap: 6px;
+}
+
+.bfox-tx-fail__banner {
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.bfox-tx-fail__banner strong {
+  color: #b91c1c;
+  font-size: 12px;
+}
+
+.bfox-tx-fail__reason {
+  margin: 6px 0 0;
+  font-size: 13px;
+  font-weight: 650;
+  color: #7f1d1d;
+  word-break: break-word;
+}
+
+.bfox-tx-fail__grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bfox-tx-fail__row {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 8px;
+  align-items: start;
+  font-size: 11px;
+}
+
+.bfox-tx-fail__label {
+  color: var(--text-muted);
+  font-weight: 650;
+  padding-top: 2px;
+}
+
+.bfox-tx-fail__value-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.bfox-tx-fail__value {
+  word-break: break-all;
+  line-height: 1.35;
+  flex: 1;
+  min-width: 0;
+}
+
+.bfox-tx-fail__copy {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 650;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--purple);
+  cursor: pointer;
+}
+
+.bfox-tx-fail__raw {
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+.bfox-tx-fail__raw summary {
+  cursor: pointer;
+  font-weight: 650;
+  color: var(--text-muted);
+}
+
+.bfox-tx-fail__raw pre {
+  margin: 6px 0 0;
+  padding: 8px;
+  max-height: 140px;
+  overflow: auto;
+  border-radius: var(--radius-md);
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.bfox-tx-fail__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bfox-tx-fail__btn {
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 650;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--purple);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.bfox-tx-fail__btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.bfox-tx-fail__btn--link {
+  display: inline-flex;
+  align-items: center;
+}
+
+.bfox-tx-fail__hint {
+  margin: 4px 0 0;
+  font-size: 11px;
 }
 
 .bfox-tx-history__load-more {

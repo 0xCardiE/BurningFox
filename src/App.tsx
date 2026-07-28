@@ -12,7 +12,7 @@ import { SettingsView } from './ui/SettingsView';
 import { NetworksManageView } from './ui/NetworksManageView';
 import { WalletLayout, type WalletMainTab } from './ui/WalletLayout';
 import { WalletHomeView } from './ui/WalletHomeView';
-import { SwapView } from './ui/SwapView';
+import { HistoryPanel } from './ui/HistoryPanel';
 import { ToolsView } from './ui/ToolsView';
 import { LoadingScreen } from './ui/LoadingScreen';
 import { ScreenFade } from './ui/ScreenFade';
@@ -144,9 +144,7 @@ export function App() {
         {mainTab === 'assets' ? (
           <WalletHomeView settings={settings} onSaved={() => void refresh()} />
         ) : null}
-        {mainTab === 'swap' ? (
-          <SwapView settings={settings} embedded />
-        ) : null}
+        {mainTab === 'history' ? <HistoryPanel settings={settings} /> : null}
         {mainTab === 'tools' ? <ToolsView settings={settings} /> : null}
       </WalletLayout>
     );

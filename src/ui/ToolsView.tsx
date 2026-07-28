@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import type { AppSettings } from '../lib/storageState';
 import { MultiSendView } from './MultiSendView';
-import { HistoryPanel } from './HistoryPanel';
 import { ApprovalsPanel } from './ApprovalsPanel';
+import { GasStationView } from './GasStationView';
+import { SwapView } from './SwapView';
 
-export type ToolsSubTab = 'multisend' | 'history' | 'approvals';
+export type ToolsSubTab = 'multisend' | 'gas' | 'approvals' | 'swap';
 
 const TOOL_TABS: { id: ToolsSubTab; label: string }[] = [
   { id: 'multisend', label: 'Multisend' },
+  { id: 'gas', label: 'Gas' },
   { id: 'approvals', label: 'Approvals' },
-  { id: 'history', label: 'History' },
+  { id: 'swap', label: 'Swap' },
 ];
 
 export function ToolsView({ settings }: { settings: AppSettings }) {
@@ -33,8 +35,9 @@ export function ToolsView({ settings }: { settings: AppSettings }) {
 
       <div className="bfox-tools-panel">
         {tab === 'multisend' ? <MultiSendView settings={settings} /> : null}
+        {tab === 'gas' ? <GasStationView settings={settings} /> : null}
         {tab === 'approvals' ? <ApprovalsPanel settings={settings} /> : null}
-        {tab === 'history' ? <HistoryPanel settings={settings} /> : null}
+        {tab === 'swap' ? <SwapView settings={settings} embedded /> : null}
       </div>
     </div>
   );

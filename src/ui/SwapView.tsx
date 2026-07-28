@@ -19,6 +19,7 @@ import type { OnChainBalanceProbe } from '../lib/ethereum';
 import { transactionExplorerUrl } from '../lib/explorerUrls';
 import { appendSwapToHistory, loadSwapHistory, type SwapHistoryEntry } from '../lib/swapHistory';
 import { loadSwapUi, saveSwapUi } from '../lib/swapUiPersist';
+import { describeRevertedTx } from '../lib/txFailureDetail';
 import { ScreenHeader } from './ScreenHeader';
 import { JumpaLiFiIcon } from './JumpaLiFiIcon';
 import { JumpaTokenWithBadge } from './JumpaTokenWithBadge';
@@ -1151,7 +1152,7 @@ export function SwapView({
           setExecTx({ chainId: fromC, hash: ah as `0x${string}` });
           const recApprove = await waitForChainReceipt(ah, fromC);
           if (recApprove.status !== 'success') {
-            setExecLog('Approval transaction reverted.');
+            setExecLog(await describeRevertedTx(fromC, ah as `0x${string}`));
             setExecTx(null);
             return;
           }
@@ -1182,7 +1183,7 @@ export function SwapView({
       setExecTx({ chainId: fromC, hash: hex });
       const rec = await waitForChainReceipt(txHash, fromC);
       if (rec.status !== 'success') {
-        setExecLog(`Transaction reverted: ${txHash}`);
+        setExecLog(await describeRevertedTx(fromC, hex));
         setExecTx({ chainId: fromC, hash: hex });
         return;
       }

@@ -18,6 +18,11 @@ import {
   mergeTxRows,
   saveTxHistoryCache,
 } from '../lib/txHistoryCursor';
+import {
+  failureDetailAsText,
+  fetchTxFailureDetail,
+  type TxFailureDetail,
+} from '../lib/txFailureDetail';
 import { describeError } from '../lib/utils';
 import { JumpaLiFiIcon } from './JumpaLiFiIcon';
 
@@ -66,6 +71,10 @@ function shortAddress(addr: string): string {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
 
+function shortHash(hash: string): string {
+  return `${hash.slice(0, 10)}…${hash.slice(-6)}`;
+}
+
 function txKind(row: TxHistoryRow): TxKind {
   if (row.direction === 'self') return 'self';
   if (row.value === 0n && row.to) return 'contract';
@@ -73,7 +82,12 @@ function txKind(row: TxHistoryRow): TxKind {
   return 'sent';
 }
 
-function txTitle(kind: TxKind, symbol: string): string {
+function txTitle(kind: TxKind, symbol: string, row: TxHistoryRow): string {
+  if (!row.success) {
+    if (row.functionName) return `Failed · ${row.functionName.split('(')[0]}`;
+    if (kind === 'contract') return 'Failed contract call';
+    return `Failed ${kind === 'sent' ? 'send' : kind}`;
+  }
   switch (kind) {
     case 'sent':
       return `Sent ${symbol}`;
@@ -82,18 +96,19 @@ function txTitle(kind: TxKind, symbol: string): string {
     case 'self':
       return `Self ${symbol}`;
     case 'contract':
-      return 'Contract interaction';
+      return row.functionName ? row.functionName.split('(')[0] : 'Contract interaction';
   }
 }
 
 function txSubtitle(row: TxHistoryRow, kind: TxKind): string {
-  if (kind === 'self') return 'Self transfer';
-  if (kind === 'contract' && row.to) return `With ${shortAddress(row.to)}`;
+  const methodBit = row.methodId && row.success === false ? `${row.methodId} · ` : '';
+  if (kind === 'self') return `${methodBit}Self transfer`;
+  if (kind === 'contract' && row.to) return `${methodBit}With ${shortAddress(row.to)}`;
   if (kind === 'received') {
-    return row.from ? `From ${shortAddress(row.from)}` : 'Incoming transfer';
+    return row.from ? `${methodBit}From ${shortAddress(row.from)}` : `${methodBit}Incoming transfer`;
   }
-  if (row.to) return `To ${shortAddress(row.to)}`;
-  return 'Outgoing transfer';
+  if (row.to) return `${methodBit}To ${shortAddress(row.to)}`;
+  return `${methodBit}Outgoing transfer`;
 }
 
 function formatAmount(row: TxHistoryRow, chainId: number): string | null {
@@ -163,62 +178,252 @@ function ExternalLinkIcon() {
   );
 }
 
+function DetailRow({
+  label,
+  value,
+  mono,
+  copyable,
+}: {
+  label: string;
+  value: string | null | undefined;
+  mono?: boolean;
+  copyable?: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+  if (value == null || value === '') return null;
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value!);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return (
+    <div className="bfox-tx-fail__row">
+      <span className="bfox-tx-fail__label">{label}</span>
+      <div className="bfox-tx-fail__value-wrap">
+        <span className={`bfox-tx-fail__value${mono ? ' mono' : ''}`}>{value}</span>
+        {copyable ? (
+          <button type="button" className="bfox-tx-fail__copy" onClick={() => void copy()}>
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function FailedTxDetail({
+  chainId,
+  row,
+  explorerLabel,
+}: {
+  chainId: number;
+  row: TxHistoryRow;
+  explorerLabel: string;
+}) {
+  const [detail, setDetail] = useState<TxFailureDetail | null>(null);
+  const [busy, setBusy] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [copiedAll, setCopiedAll] = useState(false);
+  const url = txExplorerLink(chainId, row.hash);
+
+  useEffect(() => {
+    let cancelled = false;
+    setBusy(true);
+    setErr(null);
+    void fetchTxFailureDetail(chainId, row)
+      .then(d => {
+        if (!cancelled) setDetail(d);
+      })
+      .catch(e => {
+        if (!cancelled) setErr(describeError(e));
+      })
+      .finally(() => {
+        if (!cancelled) setBusy(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [chainId, row]);
+
+  async function copyAll() {
+    if (!detail) return;
+    try {
+      await navigator.clipboard.writeText(failureDetailAsText(detail));
+      setCopiedAll(true);
+      window.setTimeout(() => setCopiedAll(false), 1500);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return (
+    <div className="bfox-tx-fail">
+      <div className="bfox-tx-fail__banner">
+        <strong>Transaction failed</strong>
+        {busy ? <span className="muted"> Decoding revert…</span> : null}
+        {!busy && detail?.revertReason ? (
+          <p className="bfox-tx-fail__reason">{detail.revertReason}</p>
+        ) : null}
+        {!busy && !detail?.revertReason && !err ? (
+          <p className="bfox-tx-fail__reason muted">
+            No revert string recovered — see RPC / calldata below.
+          </p>
+        ) : null}
+        {err ? <p className="error">{err}</p> : null}
+      </div>
+
+      {detail ? (
+        <div className="bfox-tx-fail__grid">
+          <DetailRow label="Status" value={detail.status} />
+          <DetailRow
+            label="Hash"
+            value={detail.hash}
+            mono
+            copyable
+          />
+          <DetailRow label="Block" value={detail.blockNumber != null ? String(detail.blockNumber) : null} />
+          <DetailRow label="Nonce" value={detail.nonce != null ? String(detail.nonce) : null} />
+          <DetailRow label="From" value={detail.from} mono copyable />
+          <DetailRow label="To" value={detail.to} mono copyable />
+          <DetailRow label="Value" value={detail.valueEth ?? detail.valueWei} />
+          <DetailRow
+            label="Function"
+            value={detail.explorerHint ?? row.functionName ?? null}
+          />
+          <DetailRow label="Method ID" value={detail.methodId} mono copyable />
+          <DetailRow label="Revert selector" value={detail.revertSelector} mono copyable />
+          <DetailRow
+            label="Gas used"
+            value={
+              detail.gasUsed
+                ? `${detail.gasUsed}${detail.gasUsedPct ? ` (${detail.gasUsedPct} of limit)` : ''}`
+                : row.gasUsed?.toString() ?? null
+            }
+          />
+          <DetailRow label="Gas limit" value={detail.gasLimit ?? row.gasLimit?.toString() ?? null} />
+          <DetailRow label="Gas price" value={detail.effectiveGasPriceGwei} />
+          <DetailRow
+            label="Out of gas?"
+            value={detail.likelyOutOfGas ? 'Likely yes (≥98% gas used)' : 'Unlikely'}
+          />
+          <DetailRow label="Revert data" value={detail.revertData} mono copyable />
+          <DetailRow
+            label="Calldata"
+            value={
+              detail.input
+                ? `${detail.input.slice(0, 98)}${detail.input.length > 98 ? '…' : ''} (${detail.inputLen ?? 0} B)`
+                : null
+            }
+            mono
+            copyable
+          />
+          {detail.input && detail.input.length > 98 ? (
+            <details className="bfox-tx-fail__raw">
+              <summary>Full calldata</summary>
+              <pre className="mono">{detail.input}</pre>
+            </details>
+          ) : null}
+          {detail.rpcError ? (
+            <details className="bfox-tx-fail__raw" open>
+              <summary>RPC error</summary>
+              <pre>{detail.rpcError}</pre>
+            </details>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="bfox-tx-fail__actions">
+        <button type="button" className="bfox-tx-fail__btn" disabled={!detail} onClick={() => void copyAll()}>
+          {copiedAll ? 'Copied debug dump' : 'Copy all for debug'}
+        </button>
+        {url ? (
+          <a className="bfox-tx-fail__btn bfox-tx-fail__btn--link" href={url} target="_blank" rel="noopener noreferrer">
+            Open on {explorerLabel}
+          </a>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function TxHistoryRowItem({
   row,
   chainId,
   chainName,
   chainLogo,
   explorerLabel,
+  expanded,
+  onToggle,
 }: {
   row: TxHistoryRow;
   chainId: number;
   chainName: string;
   chainLogo: string;
   explorerLabel: string;
+  expanded: boolean;
+  onToggle: () => void;
 }) {
   const kind = txKind(row);
   const symbol = chainById(chainId)?.nativeCurrency.symbol ?? 'ETH';
-  const title = txTitle(kind, symbol);
+  const title = txTitle(kind, symbol, row);
   const subtitle = txSubtitle(row, kind);
   const amount = formatAmount(row, chainId);
   const url = txExplorerLink(chainId, row.hash);
+  const failed = !row.success;
 
   return (
-    <li className={`bfox-tx-history__item${row.success ? '' : ' bfox-tx-history__item--failed'}`}>
-      <div className="bfox-tx-history__icon-wrap">
-        <span className={`bfox-tx-history__icon bfox-tx-history__icon--${kind}`}>
-          <TxDirectionIcon kind={kind} />
-        </span>
-        <span className="bfox-tx-history__chain-badge" title={chainName}>
-          <JumpaLiFiIcon logoURI={chainLogo} label={chainName} size={14} rounded />
-        </span>
-      </div>
-
-      <div className="bfox-tx-history__main">
-        <span className="bfox-tx-history__title">{title}</span>
-        <span className="bfox-tx-history__subtitle">{subtitle}</span>
-        {!row.success ? <span className="bfox-tx-history__failed-tag">Failed</span> : null}
-      </div>
-
-      <div className="bfox-tx-history__right">
-        {amount ? (
-          <span
-            className={`bfox-tx-history__amount${
-              row.direction === 'in' ? ' bfox-tx-history__amount--in' : ''
-            }`}
-          >
-            {amount}
+    <li className={`bfox-tx-history__item${failed ? ' bfox-tx-history__item--failed' : ''}${expanded ? ' bfox-tx-history__item--open' : ''}`}>
+      <button
+        type="button"
+        className="bfox-tx-history__row-btn"
+        onClick={onToggle}
+        aria-expanded={expanded}
+      >
+        <div className="bfox-tx-history__icon-wrap">
+          <span className={`bfox-tx-history__icon bfox-tx-history__icon--${kind}`}>
+            <TxDirectionIcon kind={kind} />
           </span>
-        ) : (
-          <span className="bfox-tx-history__amount bfox-tx-history__amount--empty">—</span>
-        )}
-        <span className="bfox-tx-history__time">
-          {new Date(row.timestamp).toLocaleTimeString(undefined, {
-            hour: 'numeric',
-            minute: '2-digit',
-          })}
-        </span>
-      </div>
+          <span className="bfox-tx-history__chain-badge" title={chainName}>
+            <JumpaLiFiIcon logoURI={chainLogo} label={chainName} size={14} rounded />
+          </span>
+        </div>
+
+        <div className="bfox-tx-history__main">
+          <span className="bfox-tx-history__title">{title}</span>
+          <span className="bfox-tx-history__subtitle">{subtitle}</span>
+          {failed ? (
+            <span className="bfox-tx-history__failed-tag">
+              Failed{row.methodId ? ` · ${row.methodId}` : ''} · tap for details
+            </span>
+          ) : null}
+        </div>
+
+        <div className="bfox-tx-history__right">
+          {amount ? (
+            <span
+              className={`bfox-tx-history__amount${
+                row.direction === 'in' ? ' bfox-tx-history__amount--in' : ''
+              }`}
+            >
+              {amount}
+            </span>
+          ) : (
+            <span className="bfox-tx-history__amount bfox-tx-history__amount--empty">—</span>
+          )}
+          <span className="bfox-tx-history__time">
+            {new Date(row.timestamp).toLocaleTimeString(undefined, {
+              hour: 'numeric',
+              minute: '2-digit',
+            })}
+          </span>
+        </div>
+      </button>
 
       {url ? (
         <a
@@ -228,9 +433,52 @@ function TxHistoryRowItem({
           rel="noopener noreferrer"
           title={`View on ${explorerLabel}`}
           aria-label={`View transaction on ${explorerLabel}`}
+          onClick={e => e.stopPropagation()}
         >
           <ExternalLinkIcon />
         </a>
+      ) : null}
+
+      {expanded ? (
+        <div className="bfox-tx-history__detail">
+          {failed ? (
+            <FailedTxDetail chainId={chainId} row={row} explorerLabel={explorerLabel} />
+          ) : (
+            <div className="bfox-tx-fail bfox-tx-fail--ok">
+              <DetailRow label="Hash" value={row.hash} mono copyable />
+              <DetailRow label="Block" value={row.blockNumber != null ? String(row.blockNumber) : null} />
+              <DetailRow label="Nonce" value={row.nonce != null ? String(row.nonce) : null} />
+              <DetailRow label="From" value={row.from} mono copyable />
+              <DetailRow label="To" value={row.to} mono copyable />
+              <DetailRow label="Function" value={row.functionName} />
+              <DetailRow label="Method ID" value={row.methodId} mono copyable />
+              <DetailRow
+                label="Gas used"
+                value={
+                  row.gasUsed != null
+                    ? `${row.gasUsed.toString()}${
+                        row.gasLimit
+                          ? ` (${((Number(row.gasUsed) / Number(row.gasLimit)) * 100).toFixed(1)}%)`
+                          : ''
+                      }`
+                    : null
+                }
+              />
+              <p className="bfox-tx-fail__hint muted">
+                {shortHash(row.hash)}
+                {url ? (
+                  <>
+                    {' '}
+                    ·{' '}
+                    <a href={url} target="_blank" rel="noopener noreferrer">
+                      {explorerLabel}
+                    </a>
+                  </>
+                ) : null}
+              </p>
+            </div>
+          )}
+        </div>
       ) : null}
     </li>
   );
@@ -252,8 +500,10 @@ export function HistoryPanel({ settings }: { settings: AppSettings }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [expandedHash, setExpandedHash] = useState<string | null>(null);
 
   const grouped = useMemo(() => groupRowsByDate(rows), [rows]);
+  const failedCount = useMemo(() => rows.filter(r => !r.success).length, [rows]);
 
   const persist = useCallback(
     async (nextRows: TxHistoryRow[], pages: number, more: boolean) => {
@@ -324,6 +574,7 @@ export function HistoryPanel({ settings }: { settings: AppSettings }) {
 
   useEffect(() => {
     setHydrated(false);
+    setExpandedHash(null);
     void loadInitial();
   }, [chainId, addr, apiKey]);
 
@@ -344,6 +595,7 @@ export function HistoryPanel({ settings }: { settings: AppSettings }) {
     if (!addr) return;
     setBusy(true);
     setErr(null);
+    setExpandedHash(null);
     try {
       await clearTxHistoryCache(chainId, addr);
       setRows([]);
@@ -382,7 +634,9 @@ export function HistoryPanel({ settings }: { settings: AppSettings }) {
             <p className="bfox-tx-history__head-title">{chain?.name ?? `Chain ${chainId}`}</p>
             <p className="bfox-tx-history__head-sub muted">
               {rows.length > 0
-                ? `${rows.length} transaction${rows.length === 1 ? '' : 's'}`
+                ? `${rows.length} tx${rows.length === 1 ? '' : 's'}${
+                    failedCount ? ` · ${failedCount} failed` : ''
+                  }`
                 : 'Activity'}
               {pagesLoaded > 1 ? ` · ${pagesLoaded} pages` : ''}
             </p>
@@ -422,6 +676,10 @@ export function HistoryPanel({ settings }: { settings: AppSettings }) {
                     chainName={chain?.name ?? String(chainId)}
                     chainLogo={chainLogo ?? ''}
                     explorerLabel={explorerLabel}
+                    expanded={expandedHash === row.hash}
+                    onToggle={() =>
+                      setExpandedHash(prev => (prev === row.hash ? null : row.hash))
+                    }
                   />
                 ))}
               </ul>

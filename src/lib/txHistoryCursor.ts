@@ -1,6 +1,6 @@
 import type { TxHistoryRow } from './explorerTxHistory';
 
-const STORAGE_KEY = 'burn_box_tx_history_v1';
+const STORAGE_KEY = 'burn_box_tx_history_v2';
 
 type StoredRow = {
   hash: string;
@@ -10,6 +10,14 @@ type StoredRow = {
   timestamp: number;
   success: boolean;
   direction: 'in' | 'out' | 'self';
+  blockNumber?: number;
+  nonce?: number;
+  gasUsed?: string;
+  gasLimit?: string;
+  gasPrice?: string;
+  methodId?: string;
+  functionName?: string;
+  input?: string;
 };
 
 export type TxHistoryCache = {
@@ -33,6 +41,14 @@ function toStored(rows: TxHistoryRow[]): StoredRow[] {
     timestamp: r.timestamp,
     success: r.success,
     direction: r.direction,
+    blockNumber: r.blockNumber,
+    nonce: r.nonce,
+    gasUsed: r.gasUsed?.toString(),
+    gasLimit: r.gasLimit?.toString(),
+    gasPrice: r.gasPrice?.toString(),
+    methodId: r.methodId,
+    functionName: r.functionName,
+    input: r.input,
   }));
 }
 
@@ -45,6 +61,14 @@ function fromStored(rows: StoredRow[]): TxHistoryRow[] {
     timestamp: r.timestamp,
     success: r.success,
     direction: r.direction,
+    blockNumber: r.blockNumber,
+    nonce: r.nonce,
+    gasUsed: r.gasUsed != null ? BigInt(r.gasUsed) : undefined,
+    gasLimit: r.gasLimit != null ? BigInt(r.gasLimit) : undefined,
+    gasPrice: r.gasPrice != null ? BigInt(r.gasPrice) : undefined,
+    methodId: r.methodId,
+    functionName: r.functionName,
+    input: r.input,
   }));
 }
 

@@ -11,6 +11,15 @@ export type TxHistoryRow = {
   timestamp: number;
   success: boolean;
   direction: 'in' | 'out' | 'self';
+  blockNumber?: number;
+  nonce?: number;
+  gasUsed?: bigint;
+  gasLimit?: bigint;
+  gasPrice?: bigint;
+  methodId?: string;
+  functionName?: string;
+  /** Calldata — kept for failed txs to help debugging. */
+  input?: string;
 };
 
 export type TxHistoryPageResult = {
@@ -28,6 +37,14 @@ type RawExplorerTx = {
   timeStamp?: string;
   isError?: string;
   txreceipt_status?: string;
+  blockNumber?: string;
+  nonce?: string;
+  gas?: string;
+  gasUsed?: string;
+  gasPrice?: string;
+  methodId?: string;
+  functionName?: string;
+  input?: string;
 };
 
 function explorerOrigin(chainId: number): string | undefined {
@@ -44,6 +61,21 @@ function explorerOrigin(chainId: number): string | undefined {
 function apiKind(origin: string): ExplorerApiKind {
   if (/blockscout/i.test(origin)) return 'blockscout';
   return 'etherscan-v2';
+}
+
+function parseOptionalBigInt(v: string | undefined): bigint | undefined {
+  if (!v?.trim()) return undefined;
+  try {
+    return BigInt(v.trim());
+  } catch {
+    return undefined;
+  }
+}
+
+function parseOptionalInt(v: string | undefined): number | undefined {
+  if (!v?.trim()) return undefined;
+  const n = Number.parseInt(v.trim(), 10);
+  return Number.isFinite(n) ? n : undefined;
 }
 
 function normalizeRows(raw: RawExplorerTx[], wallet: string): TxHistoryRow[] {
@@ -81,7 +113,11 @@ function normalizeRows(raw: RawExplorerTx[], wallet: string): TxHistoryRow[] {
     const success =
       tx.isError !== '1' && (tx.txreceipt_status == null || tx.txreceipt_status === '1');
 
-    out.push({
+    const methodId =
+      tx.methodId?.trim() ||
+      (tx.input && tx.input.length >= 10 ? tx.input.slice(0, 10).toLowerCase() : undefined);
+
+    const row: TxHistoryRow = {
       hash: tx.hash as `0x${string}`,
       from,
       to,
@@ -89,7 +125,21 @@ function normalizeRows(raw: RawExplorerTx[], wallet: string): TxHistoryRow[] {
       timestamp: Number.parseInt(tx.timeStamp ?? '0', 10) * 1000,
       success,
       direction,
-    });
+      blockNumber: parseOptionalInt(tx.blockNumber),
+      nonce: parseOptionalInt(tx.nonce),
+      gasUsed: parseOptionalBigInt(tx.gasUsed),
+      gasLimit: parseOptionalBigInt(tx.gas),
+      gasPrice: parseOptionalBigInt(tx.gasPrice),
+      methodId,
+      functionName: tx.functionName?.trim() || undefined,
+    };
+
+    // Keep calldata for failures (dev diagnostics); skip huge payloads on success.
+    if (!success && tx.input && tx.input.length > 2) {
+      row.input = tx.input.length > 20_000 ? `${tx.input.slice(0, 20_000)}…` : tx.input;
+    }
+
+    out.push(row);
   }
 
   out.sort((a, b) => b.timestamp - a.timestamp);

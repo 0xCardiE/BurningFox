@@ -65,7 +65,7 @@ export async function chainJsonRpcCall<T>(
   for (const rpc of rpcList(chainId)) {
     type RpcJson = {
       result?: T;
-      error?: { message: string; code?: number };
+      error?: { message: string; code?: number; data?: unknown };
     };
     let json: RpcJson;
     try {
@@ -84,7 +84,13 @@ export async function chainJsonRpcCall<T>(
       continue;
     }
     if (json.error) {
-      throw new Error(json.error.message);
+      const err = new Error(json.error.message) as Error & {
+        code?: number;
+        data?: unknown;
+      };
+      err.code = json.error.code;
+      err.data = json.error.data;
+      throw err;
     }
     if (typeof json.result === 'undefined') {
       lastErr = new Error(`${method} returned no result`);
