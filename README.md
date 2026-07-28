@@ -24,3 +24,13 @@ Load the unpacked extension from `dist/` in Chrome (Developer mode → Load unpa
 ## Security
 
 This is a **developer/testing wallet**, not a secure hardware-backed wallet. See [docs/wallet-security.md](docs/wallet-security.md).
+
+## Wallet pain research tool
+
+Separate local app for mining Reddit/X/Google for crypto wallet user complaints:
+
+```bash
+cd wallet-research && npm install && npm run dev
+```
+
+See [wallet-research/README.md](wallet-research/README.md).
