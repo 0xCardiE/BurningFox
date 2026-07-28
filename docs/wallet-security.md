@@ -1,36 +1,20 @@
 # Wallet security model (BurnBox extension)
 
-This note describes how signing works in BurnBox, how that compares to MetaMask, and what changes when **everything runs inside the extension** (no ordinary website holding your keys).
+This note describes how signing works in BurnBox and how to keep risk lower in practice. For a full **MetaMask vs BurnBox** comparison across vault crypto, session storage, auto-lock, dApp signing, and related topics, see **[wallet-comparison-metamask.md](./wallet-comparison-metamask.md)**.
 
 ## What the extension does today
 
 - After unlock, the wallet uses a **local Viem account** (`PrivateKeyAccount`) to **sign transactions in extension code**.
 - Signed txs are broadcast with **`eth_sendRawTransaction`** over your configured RPC (see `src/lib/ethereum.ts`).
-- There is **no injected provider** and **no wallet connection flow** to random dapps: actions are initiated from the extension UI (popup / side panel).
-- The unlocked **private key is kept for the browsing session** in the MV3 **service worker**, with a copy in **`chrome.storage.session`**, so the popup can close and reopen without re-entering the key (see `src/background.ts` header comment and `SESSION_KEY`). **Lock** or **auto-lock** clears that session.
+- A full **EIP-1193 provider** is injected into pages (`window.ethereum`), with optional MetaMask replacement — see `src/inpage/provider.ts` and `src/lib/providerRpc.ts`.
+- **Turbo mode (default):** dApp sign/send requests execute automatically while unlocked. **Normal mode:** each request is queued for approval in `TxApprovalSheet`.
+- The unlocked **private key is kept for the browsing session** in the MV3 **service worker**, with a **plaintext copy in `chrome.storage.session`**, so the popup can close and reopen without re-entering the password (see `src/background.ts`). **Lock** or **auto-lock** clears that session.
 
-So each swap is still “sign + send,” but the **approval UX is “already unlocked”**, not a separate MetaMask confirmation sheet every time.
+Extension UI actions (swap, send, etc.) also sign via the unlocked account without a separate password prompt.
 
-## Compared to MetaMask (typical dapp flow)
+## Compared to MetaMask (short)
 
-| Aspect | BurnBox (this extension) | MetaMask (typical) |
-|--------|------------------------|---------------------|
-| Where the key lives | Extension: UI + service worker / `chrome.storage.session` while unlocked | Extension: isolated vault; dapp never holds the key |
-| Who signs | Our code calls `signTransaction` after unlock | User confirms in wallet UI; extension signs |
-| Per-tx human gate | Optional: lock / re-unlock; otherwise one tap after unlock | Usually one confirmation per operation |
-| Random website attack surface | **Not** exposing keys to page JS if you only use the extension UI and don’t inject keys into pages | Dapp prompts MetaMask; user reviews in wallet UI |
-
-**Summary:** MetaMask’s main security advantage for end users is **separation + explicit review**: the dapp is untrusted, and the wallet UI is the gate. BurnBox is closer to a **hot wallet inside the extension**: fast UX, but after unlock, **code that runs in the extension context can sign on your behalf** until you lock or auto-lock.
-
-## Extension-only usage: what gets better
-
-If you **do not** use this key for normal website interactions (no pasting the key on a site, no third-party dapp connecting to this wallet):
-
-- You avoid the classic **`window.ethereum` / WalletConnect + malicious dapp** class of attacks against *this* key.
-- Your signing surface is **your extension package + Chrome + dependencies**, not every origin you visit.
-- Manifest uses **extension page CSP** (`script-src 'self'` in `public/manifest.json`), which limits remote script injection into extension pages (does not remove all bugs; it raises the bar).
-
-That is meaningfully **safer than “key in a normal webpage”** or “approve every site.” It does **not** make the key cold storage: it remains a **hot, software-held key** in the browser.
+MetaMask’s main end-user advantage is **separation + explicit review**: the dapp is untrusted, and the wallet UI confirms every sign/send by default. BurnBox defaults to **speed** — stay unlocked, persist session across UI close, and auto-sign dApp traffic in Turbo mode. Both are **hot software wallets**; see the [full comparison table](./wallet-comparison-metamask.md) for all 17 security topics.
 
 ## Remaining risks (even extension-only)
 
@@ -41,9 +25,9 @@ That is meaningfully **safer than “key in a normal webpage”** or “approve 
 
 ## Ways to keep risk lower (aligned with this codebase)
 
-1. **Use Lock** when you step away; set **auto-lock** to a short idle time in settings (background clears session storage on expiry).
-2. **Keep usage scoped to this extension** only; use a **separate wallet** for experimental dapps or airdrop farming.
-3. **Avoid adding content scripts** that forward keys or signing to arbitrary pages; keep signing in extension surfaces only.
+1. **Use Lock** when you step away; enable **auto-lock** (off by default) to a short idle time in settings.
+2. Switch dApp mode to **Normal** if you want MetaMask-style per-request confirmation instead of Turbo auto-sign.
+3. Use a **separate wallet** for experimental dapps or airdrop farming; treat this key as a **burner**.
 4. **Install from a trustworthy build** (your own `npm run build`, signed distribution if you ship later—not a random repack).
 5. For **large holdings**, use a **hardware wallet** or offline custody; this project’s model is convenience-first software custody.
 

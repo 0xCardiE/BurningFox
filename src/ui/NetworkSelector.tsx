@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   effectiveActiveChainId,
   patchSettings,
@@ -13,7 +13,17 @@ import {
 } from '../lib/chainCatalog';
 import { chainLogoUri } from '../lib/chainLogo';
 import { notifyConnectedTabsChainChanged } from '../lib/chainSyncBridge';
-import { allRpcOptionsFor } from '../lib/chainRpcRegistry';
+import { allRpcOptionsFor, rpcUrlsFor } from '../lib/chainRpcRegistry';
+import { openNetworkDoctor } from '../lib/rpcDoctorBridge';
+import {
+  getChainHealthSnapshot,
+  probeChainRpcs,
+  rpcHostLabel,
+  rpcProviderHint,
+  setStickyRpc,
+  subscribeRpcHealth,
+  summarizeChainHealth,
+} from '../lib/rpcHealth';
 import { describeError } from '../lib/utils';
 import { BfoxSelect, BfoxSegmented, type BfoxSelectGroup } from './BfoxSelect';
 
@@ -29,28 +39,7 @@ function defaultChainForKind(kind: NetFilter): number {
 }
 
 function shortRpcLabel(url: string): string {
-  try {
-    const u = new URL(url);
-    const path = u.pathname === '/' ? '' : u.pathname;
-    return `${u.host}${path}`;
-  } catch {
-    return url;
-  }
-}
-
-function rpcProviderHint(url: string): string {
-  const host = shortRpcLabel(url).toLowerCase();
-  if (host.includes('publicnode')) return 'PublicNode';
-  if (host.includes('drpc')) return 'dRPC';
-  if (host.includes('ankr')) return 'Ankr';
-  if (host.includes('llamarpc')) return 'LlamaRPC';
-  if (host.includes('blastapi')) return 'Blast';
-  if (host.includes('1rpc')) return '1RPC';
-  if (host.includes('meowrpc')) return 'MeowRPC';
-  if (host.includes('tenderly')) return 'Tenderly';
-  if (host.includes('binance')) return 'Binance';
-  if (host.includes('alchemy')) return 'Alchemy';
-  return 'Public';
+  return rpcHostLabel(url);
 }
 
 function chainToOption(c: ChainDefinition) {
@@ -75,17 +64,56 @@ export function NetworkSelector({ settings, onSaved }: Props) {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [healthTick, setHealthTick] = useState(0);
+
+  const allUrls = useMemo(
+    () => rpcUrlsFor(activeChainId),
+    [activeChainId, settings.preferredRpcByChain, settings.customRpcByChain, settings.customChains],
+  );
 
   const rpcOptions = useMemo(
     () => allRpcOptionsFor(activeChainId),
-    [activeChainId, settings.preferredRpcByChain, settings.customRpcByChain],
+    [activeChainId, settings.preferredRpcByChain, settings.customRpcByChain, healthTick],
   );
 
   const rpcUrl = useMemo(() => {
     const preferred = settings.preferredRpcByChain?.[String(activeChainId)];
-    if (preferred && rpcOptions.includes(preferred)) return preferred;
+    const snap = getChainHealthSnapshot(activeChainId, allUrls);
+    const prefHealth = preferred
+      ? snap.endpoints.find(e => e.url === preferred)
+      : undefined;
+    // Don't present a demoted preferred as "active" — sticky healthy wins
+    if (
+      preferred &&
+      rpcOptions.includes(preferred) &&
+      prefHealth?.status !== 'unhealthy'
+    ) {
+      return preferred;
+    }
+    if (snap.activeUrl && rpcOptions.includes(snap.activeUrl)) return snap.activeUrl;
     return rpcOptions[0] ?? '';
-  }, [activeChainId, settings.preferredRpcByChain, rpcOptions]);
+  }, [activeChainId, settings.preferredRpcByChain, rpcOptions, allUrls, healthTick]);
+
+  const healthSummary = useMemo(() => {
+    const snap = getChainHealthSnapshot(activeChainId, allUrls);
+    return summarizeChainHealth(snap);
+  }, [activeChainId, allUrls, healthTick]);
+
+  useEffect(() => subscribeRpcHealth(id => {
+    if (id === activeChainId) setHealthTick(t => t + 1);
+  }), [activeChainId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (allUrls.length === 0) return;
+      await probeChainRpcs(activeChainId, allUrls, { limit: 4 });
+      if (!cancelled) setHealthTick(t => t + 1);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeChainId, allUrls.join('|')]);
 
   const chainGroupsMemo = useMemo(
     () => chainGroups(netFilter),
@@ -96,14 +124,29 @@ export function NetworkSelector({ settings, onSaved }: Props) {
     () => [
       {
         label: 'RPC endpoints',
-        options: rpcOptions.map(u => ({
-          value: u,
-          label: shortRpcLabel(u),
-          sublabel: rpcProviderHint(u),
-        })),
+        options: rpcOptions.map(u => {
+          const h = getChainHealthSnapshot(activeChainId, allUrls).endpoints.find(
+            e => e.url === u,
+          );
+          const statusBit =
+            h?.status === 'healthy'
+              ? 'Healthy'
+              : h?.status === 'slow'
+                ? 'Slow'
+                : h?.status === 'unhealthy'
+                  ? 'Down'
+                  : 'Unchecked';
+          return {
+            value: u,
+            label: shortRpcLabel(u),
+            sublabel: `${rpcProviderHint(u)} · ${statusBit}${
+              h?.lastLatencyMs != null ? ` · ${h.lastLatencyMs}ms` : ''
+            }`,
+          };
+        }),
       },
     ],
-    [rpcOptions],
+    [rpcOptions, activeChainId, allUrls, healthTick],
   );
 
   async function onChainChange(nextId: number) {
@@ -126,6 +169,7 @@ export function NetworkSelector({ settings, onSaved }: Props) {
     setBusy(true);
     setErr(null);
     try {
+      setStickyRpc(activeChainId, nextUrl.trim());
       await patchSettings({
         preferredRpcByChain: {
           ...(settings.preferredRpcByChain ?? {}),
@@ -133,6 +177,7 @@ export function NetworkSelector({ settings, onSaved }: Props) {
         },
       });
       onSaved();
+      setHealthTick(t => t + 1);
     } catch (e) {
       setErr(describeError(e));
     } finally {
@@ -196,6 +241,30 @@ export function NetworkSelector({ settings, onSaved }: Props) {
           panelMaxHeight={300}
           onPick={v => void onRpcChange(v)}
         />
+      </div>
+
+      <div className="bfox-rpc-status">
+        <span
+          className={`bfox-rpc-status__dot bfox-rpc-status__dot--${healthSummary.tone}`}
+          aria-hidden
+        />
+        <span className="bfox-rpc-status__text">
+          <strong>{healthSummary.label}</strong>
+          <span className="muted"> · {healthSummary.detail}</span>
+        </span>
+        <button
+          type="button"
+          className="bfox-rpc-status__doctor"
+          onClick={() =>
+            openNetworkDoctor({
+              chainId: activeChainId,
+              reason: healthSummary.tone === 'bad' ? 'probe_failed' : 'manual',
+              lastError: healthSummary.tone === 'bad' ? healthSummary.detail : undefined,
+            })
+          }
+        >
+          Doctor
+        </button>
       </div>
 
       {err ? <p className="error bfox-net-select__err">{err}</p> : null}

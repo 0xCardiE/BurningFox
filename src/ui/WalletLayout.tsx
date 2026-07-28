@@ -5,6 +5,7 @@ import type { AppSettings } from '../lib/storageState';
 import { NetworkSelector } from './NetworkSelector';
 import { DappConnectionBar } from './DappConnectionBar';
 import { TxApprovalSheet } from './TxApprovalSheet';
+import { NetworkDoctorSheet } from './NetworkDoctorSheet';
 
 export type WalletMainTab = 'assets' | 'history' | 'tools';
 
@@ -106,6 +107,7 @@ export function WalletLayout({
 
       <DappConnectionBar settings={settings} onSaved={onSaved} />
       <TxApprovalSheet settings={settings} />
+      <NetworkDoctorSheet settings={settings} onSaved={onSaved} />
     </div>
   );
 }

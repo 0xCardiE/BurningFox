@@ -1,14 +1,21 @@
 import { decodeFunctionResult, encodeFunctionData } from 'viem';
 import type { TransactionRequest } from '@lifi/types';
-import { rpcUrlsFor } from './chainRpcRegistry';
+import { healthyRpcUrlsFor } from './chainRpcRegistry';
 import { getUnlockedAccount } from './accountSession';
 import { ERC20_ABI, MULTICALL3_ABI, MULTICALL3_ADDRESS } from './abis';
+import {
+  classifyRpcFailure,
+  recordRpcFailure,
+  recordRpcSuccess,
+  RpcExhaustedError,
+} from './rpcHealth';
+import { openNetworkDoctor } from './rpcDoctorBridge';
 
 const ZERO = '0x0000000000000000000000000000000000000000';
 const ETH_PLACEHOLDER = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
 
 function rpcList(chainId: number): string[] {
-  const list = rpcUrlsFor(chainId);
+  const list = healthyRpcUrlsFor(chainId);
   if (list.length === 0) {
     throw new Error(
       `No RPC URLs for chain ${chainId}. Open the extension again after LiFi chains load, or try another network.`,
@@ -23,10 +30,11 @@ export async function waitForChainReceipt(
   timeoutMs = 5 * 60 * 1000,
   intervalMs = 4000,
 ): Promise<{ status: 'success' | 'reverted' }> {
-  const rpcs = rpcList(chainId);
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
+    const rpcs = rpcList(chainId);
     for (const rpc of rpcs) {
+      const t0 = performance.now();
       try {
         const res = await fetch(rpc, {
           method: 'POST',
@@ -38,20 +46,41 @@ export async function waitForChainReceipt(
             params: [txHash],
           }),
         });
+        const latencyMs = Math.round(performance.now() - t0);
+        if (!res.ok) {
+          recordRpcFailure(chainId, rpc, `HTTP ${res.status}`, {
+            hard: res.status >= 500 || res.status === 429,
+            latencyMs,
+          });
+          continue;
+        }
         const json = (await res.json()) as {
           result?: { status: string };
           error?: { message: string };
         };
+        if (json.error?.message) {
+          const cls = classifyRpcFailure(json.error.message);
+          if (cls.demote) {
+            recordRpcFailure(chainId, rpc, json.error.message, {
+              hard: cls.hard,
+              latencyMs,
+            });
+          }
+          if (cls.retryOtherRpc) continue;
+        }
         if (json.result?.status) {
+          recordRpcSuccess(chainId, rpc, latencyMs);
           return {
             status: json.result.status === '0x1' ? 'success' : 'reverted',
           };
         }
-      } catch {
-        /* try next RPC */
+      } catch (err) {
+        const latencyMs = Math.round(performance.now() - t0);
+        const msg = err instanceof Error ? err.message : String(err);
+        recordRpcFailure(chainId, rpc, msg, { hard: true, latencyMs });
       }
     }
-    await new Promise((r) => setTimeout(r, intervalMs));
+    await new Promise(r => setTimeout(r, intervalMs));
   }
   throw new Error(`Timed out waiting for receipt ${txHash} (chain ${chainId})`);
 }
@@ -62,27 +91,57 @@ export async function chainJsonRpcCall<T>(
   params: unknown[],
 ): Promise<T> {
   let lastErr: unknown = null;
+  const tried: string[] = [];
+
   for (const rpc of rpcList(chainId)) {
     type RpcJson = {
       result?: T;
       error?: { message: string; code?: number; data?: unknown };
     };
-    let json: RpcJson;
+    const t0 = performance.now();
+    tried.push(rpc);
+
+    let res: Response;
     try {
-      const res = await fetch(rpc, {
+      res = await fetch(rpc, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
       });
-      if (!res.ok) {
-        lastErr = new Error(`${rpc} returned ${res.status}`);
-        continue;
+    } catch (err) {
+      const latencyMs = Math.round(performance.now() - t0);
+      lastErr = err;
+      recordRpcFailure(chainId, rpc, err instanceof Error ? err.message : String(err), {
+        hard: true,
+        latencyMs,
+      });
+      continue;
+    }
+
+    const latencyMs = Math.round(performance.now() - t0);
+
+    if (!res.ok) {
+      const msg = `HTTP ${res.status}`;
+      lastErr = new Error(`${rpc} returned ${res.status}`);
+      const cls = classifyRpcFailure(msg, res.status);
+      if (cls.demote) {
+        recordRpcFailure(chainId, rpc, msg, { hard: cls.hard, latencyMs });
       }
+      continue;
+    }
+
+    let json: RpcJson;
+    try {
       json = (await res.json()) as RpcJson;
     } catch (err) {
       lastErr = err;
+      recordRpcFailure(chainId, rpc, 'Invalid JSON from RPC', {
+        hard: true,
+        latencyMs,
+      });
       continue;
     }
+
     if (json.error) {
       const err = new Error(json.error.message) as Error & {
         code?: number;
@@ -90,19 +149,43 @@ export async function chainJsonRpcCall<T>(
       };
       err.code = json.error.code;
       err.data = json.error.data;
+      const cls = classifyRpcFailure(err);
+      if (cls.retryOtherRpc) {
+        lastErr = err;
+        if (cls.demote) {
+          recordRpcFailure(chainId, rpc, err.message, {
+            hard: cls.hard,
+            latencyMs,
+          });
+        }
+        continue;
+      }
+      // Endpoint is fine — call-level failure (revert, bad params, etc.)
+      recordRpcSuccess(chainId, rpc, latencyMs);
       throw err;
     }
+
     if (typeof json.result === 'undefined') {
       lastErr = new Error(`${method} returned no result`);
+      recordRpcFailure(chainId, rpc, String(lastErr), {
+        hard: false,
+        latencyMs,
+      });
       continue;
     }
+
+    recordRpcSuccess(chainId, rpc, latencyMs);
     return json.result;
   }
-  throw new Error(
-    `${method} on chain ${chainId} failed across all RPCs: ${
-      lastErr instanceof Error ? lastErr.message : String(lastErr)
-    }`,
-  );
+
+  const lastMsg = lastErr instanceof Error ? lastErr.message : String(lastErr);
+  openNetworkDoctor({
+    chainId,
+    reason: 'exhausted',
+    lastError: lastMsg,
+    method,
+  });
+  throw new RpcExhaustedError(chainId, tried, lastMsg, method);
 }
 
 export async function getNativeBalance(

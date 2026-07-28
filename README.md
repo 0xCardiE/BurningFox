@@ -23,7 +23,7 @@ Load the unpacked extension from `dist/` in Chrome (Developer mode → Load unpa
 
 ## Security
 
-This is a **developer/testing wallet**, not a secure hardware-backed wallet. See [docs/wallet-security.md](docs/wallet-security.md).
+This is a **developer/testing wallet**, not a secure hardware-backed wallet. See [docs/wallet-security.md](docs/wallet-security.md) and [MetaMask comparison](docs/wallet-comparison-metamask.md).
 
 ## Wallet pain research tool
 

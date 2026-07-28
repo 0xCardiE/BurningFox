@@ -1,6 +1,7 @@
 import type { ExtendedChain } from '@lifi/types';
 import { CHAIN_CATALOG, MAX_RPC_OPTIONS, type ChainDefinition } from './chainCatalog';
 import { CHAIN_RPC_FALLBACK } from './constants';
+import { sortUrlsByHealth } from './rpcHealth';
 
 const catalogRpcs: Record<number, string[]> = Object.fromEntries(
   CHAIN_CATALOG.map(c => [c.chainId, [...c.rpcUrls]]),
@@ -87,7 +88,12 @@ export function rpcUrlsFor(chainId: number): string[] {
   return merged;
 }
 
+/** Health-ordered RPC list for failover (session demotions applied). */
+export function healthyRpcUrlsFor(chainId: number): string[] {
+  return sortUrlsByHealth(chainId, rpcUrlsFor(chainId));
+}
+
 /** All known RPC endpoints for a chain (for dropdown UI). Capped at {@link MAX_RPC_OPTIONS}. */
 export function allRpcOptionsFor(chainId: number, max = MAX_RPC_OPTIONS): string[] {
-  return rpcUrlsFor(chainId).slice(0, max);
+  return healthyRpcUrlsFor(chainId).slice(0, max);
 }
