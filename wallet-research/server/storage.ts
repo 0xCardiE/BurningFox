@@ -16,10 +16,22 @@ const DEFAULT_DATA: AppData = {
 };
 
 let cache: AppData | null = null;
+/** mtimeMs of DATA_FILE when cache was loaded — detects CLI writes from another process */
+let cacheMtimeMs = 0;
 
 async function ensureDataDir() {
   const { mkdir } = await import('node:fs/promises');
   await mkdir(DATA_DIR, { recursive: true });
+}
+
+async function fileMtimeMs(): Promise<number> {
+  try {
+    const { stat } = await import('node:fs/promises');
+    const s = await stat(DATA_FILE);
+    return s.mtimeMs;
+  } catch {
+    return 0;
+  }
 }
 
 function mergeQueries(stored: SearchQuery[] | undefined) {
@@ -38,8 +50,13 @@ function mergeQueries(stored: SearchQuery[] | undefined) {
 }
 
 export async function loadData(): Promise<AppData> {
-  if (cache) return cache;
   await ensureDataDir();
+  const mtime = await fileMtimeMs();
+
+  // Reload when another process (CLI search/prune) updated the file
+  if (cache && mtime > 0 && mtime === cacheMtimeMs) {
+    return cache;
+  }
 
   try {
     const { readFile } = await import('node:fs/promises');
@@ -51,6 +68,7 @@ export async function loadData(): Promise<AppData> {
       queries: mergeQueries(parsed.queries),
       settings: { ...DEFAULT_DATA.settings, ...parsed.settings },
     };
+    cacheMtimeMs = mtime || (await fileMtimeMs());
     return cache;
   } catch {
     cache = structuredClone(DEFAULT_DATA);
@@ -64,6 +82,12 @@ export async function saveData(data: AppData): Promise<void> {
   await ensureDataDir();
   const { writeFile } = await import('node:fs/promises');
   await writeFile(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
+  cacheMtimeMs = await fileMtimeMs();
+}
+
+export function invalidateCache(): void {
+  cache = null;
+  cacheMtimeMs = 0;
 }
 
 export function postKey(source: ResearchPost['source'], url: string): string {
