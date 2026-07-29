@@ -49,7 +49,7 @@ function CopyBtn({ text }: { text: string }) {
   }
 
   return (
-    <button type="button" className="bfox-tx-approval__copy" onClick={() => void onCopy()}>
+    <button type="button" className="l33t-tx-approval__copy" onClick={() => void onCopy()}>
       {copied ? 'Copied' : 'Copy'}
     </button>
   );
@@ -57,10 +57,10 @@ function CopyBtn({ text }: { text: string }) {
 
 function DetailField({ f }: { f: ApprovalDetailField }) {
   return (
-    <div className={`bfox-tx-approval__field${f.warn ? ' bfox-tx-approval__field--warn' : ''}`}>
+    <div className={`l33t-tx-approval__field${f.warn ? ' l33t-tx-approval__field--warn' : ''}`}>
       <dt>{f.label}</dt>
-      <dd className={f.mono ? 'bfox-tx-approval__mono' : undefined}>
-        <span className="bfox-tx-approval__value">{f.value}</span>
+      <dd className={f.mono ? 'l33t-tx-approval__mono' : undefined}>
+        <span className="l33t-tx-approval__value">{f.value}</span>
         {f.copyable ? <CopyBtn text={f.value} /> : null}
       </dd>
     </div>
@@ -126,23 +126,23 @@ function FunctionSourceBlock({
   const contractUrl = addressExplorerLink(chainId, contractAddress);
 
   return (
-    <div className="bfox-tx-approval__fn-source">
+    <div className="l33t-tx-approval__fn-source">
       <button
         type="button"
-        className="bfox-tx-approval__fn-source-head"
+        className="l33t-tx-approval__fn-source-head"
         aria-expanded={open}
         onClick={() => setOpen(v => !v)}
       >
-        <span className="bfox-tx-approval__fn-source-title">
+        <span className="l33t-tx-approval__fn-source-title">
           Function source
-          <span className="bfox-tx-approval__chev" aria-hidden>
+          <span className="l33t-tx-approval__chev" aria-hidden>
             {open ? '▾' : '▸'}
           </span>
         </span>
         {contractUrl ? (
-          <span className="bfox-tx-approval__fn-source-actions">
+          <span className="l33t-tx-approval__fn-source-actions">
             <a
-              className="bfox-tx-approval__fn-source-link"
+              className="l33t-tx-approval__fn-source-link"
               href={contractUrl}
               target="_blank"
               rel="noopener noreferrer"
@@ -155,21 +155,21 @@ function FunctionSourceBlock({
         ) : null}
       </button>
       {open ? (
-        <div className="bfox-tx-approval__fn-source-body">
+        <div className="l33t-tx-approval__fn-source-body">
           {!result ? (
-            <p className="bfox-tx-approval__fn-source-meta muted">Loading verified source…</p>
+            <p className="l33t-tx-approval__fn-source-meta muted">Loading verified source…</p>
           ) : result.functionSource ? (
             <>
               {result.contractName ? (
-                <p className="bfox-tx-approval__fn-source-meta muted">
+                <p className="l33t-tx-approval__fn-source-meta muted">
                   {result.contractName}
                   {result.sourceFileHint ? ` · ${result.sourceFileHint.replace('// File: ', '')}` : ''}
                 </p>
               ) : null}
-              <pre className="bfox-tx-approval__fn-source-pre">{result.functionSource}</pre>
+              <pre className="l33t-tx-approval__fn-source-pre">{result.functionSource}</pre>
             </>
           ) : (
-            <p className="bfox-tx-approval__fn-source-meta muted">{result.error ?? 'Source unavailable.'}</p>
+            <p className="l33t-tx-approval__fn-source-meta muted">{result.error ?? 'Source unavailable.'}</p>
           )}
         </div>
       ) : null}
@@ -195,22 +195,22 @@ function OverviewSection({
   const showSource = likelyIdx !== -1 && !!functionSignature && !!contractAddress;
 
   return (
-    <section className="bfox-tx-approval__section">
+    <section className="l33t-tx-approval__section">
       <button
         type="button"
-        className="bfox-tx-approval__section-head"
+        className="l33t-tx-approval__section-head"
         aria-expanded={open}
         onClick={() => setOpen(v => !v)}
       >
         <span>{section.title}</span>
-        <span className="bfox-tx-approval__chev" aria-hidden>
+        <span className="l33t-tx-approval__chev" aria-hidden>
           {open ? '▾' : '▸'}
         </span>
       </button>
       {open ? (
         showSource ? (
           <>
-            <dl className="bfox-tx-approval__fields">
+            <dl className="l33t-tx-approval__fields">
               {section.fields.slice(0, likelyIdx + 1).map(field => (
                 <DetailField key={`${section.id}-${field.label}`} f={field} />
               ))}
@@ -223,7 +223,7 @@ function OverviewSection({
             />
           </>
         ) : (
-          <dl className="bfox-tx-approval__fields">
+          <dl className="l33t-tx-approval__fields">
             {section.fields.map(field => (
               <DetailField key={`${section.id}-${field.label}`} f={field} />
             ))}
@@ -238,20 +238,20 @@ function DetailSection({ section }: { section: ApprovalDetailSection }) {
   const [open, setOpen] = useState(section.defaultOpen ?? false);
 
   return (
-    <section className="bfox-tx-approval__section">
+    <section className="l33t-tx-approval__section">
       <button
         type="button"
-        className="bfox-tx-approval__section-head"
+        className="l33t-tx-approval__section-head"
         aria-expanded={open}
         onClick={() => setOpen(v => !v)}
       >
         <span>{section.title}</span>
-        <span className="bfox-tx-approval__chev" aria-hidden>
+        <span className="l33t-tx-approval__chev" aria-hidden>
           {open ? '▾' : '▸'}
         </span>
       </button>
       {open ? (
-        <dl className="bfox-tx-approval__fields">
+        <dl className="l33t-tx-approval__fields">
           {section.fields.map(field => (
             <DetailField key={`${section.id}-${field.label}`} f={field} />
           ))}
@@ -324,11 +324,11 @@ const GAS_FIELD_TIPS = {
 
 function GasFieldLabel({ label, tip }: { label: string; tip: string }) {
   return (
-    <span className="bfox-tx-approval__gas-fee-field-label">
+    <span className="l33t-tx-approval__gas-fee-field-label">
       {label}
       <button
         type="button"
-        className="bfox-tx-approval__gas-tip"
+        className="l33t-tx-approval__gas-tip"
         aria-label={`About ${label}`}
         data-tip={tip}
       >
@@ -389,15 +389,15 @@ function GasFeeBar({
   const modeLabel = isCustom ? 'Custom' : 'Auto';
 
   return (
-    <div className="bfox-tx-approval__gas-fee">
-      <div className="bfox-tx-approval__gas-fee-row">
-        <span className="bfox-tx-approval__gas-fee-label">Network fee</span>
-        <span className="bfox-tx-approval__gas-fee-value">
+    <div className="l33t-tx-approval__gas-fee">
+      <div className="l33t-tx-approval__gas-fee-row">
+        <span className="l33t-tx-approval__gas-fee-label">Network fee</span>
+        <span className="l33t-tx-approval__gas-fee-value">
           {feeLabel} · {modeLabel}
         </span>
         <button
           type="button"
-          className={`bfox-tx-approval__gas-fee-custom${isCustom ? ' bfox-tx-approval__gas-fee-custom--active' : ''}`}
+          className={`l33t-tx-approval__gas-fee-custom${isCustom ? ' l33t-tx-approval__gas-fee-custom--active' : ''}`}
           aria-pressed={isCustom}
           onClick={() => toggleCustom()}
         >
@@ -406,8 +406,8 @@ function GasFeeBar({
       </div>
 
       {isCustom ? (
-        <div className="bfox-tx-approval__gas-fee-panel">
-          <label className="bfox-tx-approval__gas-fee-field">
+        <div className="l33t-tx-approval__gas-fee-panel">
+          <label className="l33t-tx-approval__gas-fee-field">
             <GasFieldLabel label="Max fee (gwei)" tip={GAS_FIELD_TIPS.maxFee} />
             <input
               type="text"
@@ -419,7 +419,7 @@ function GasFeeBar({
               placeholder={autoEstimate ? gweiToInput(autoEstimate.maxFeePerGas) : ''}
             />
           </label>
-          <label className="bfox-tx-approval__gas-fee-field">
+          <label className="l33t-tx-approval__gas-fee-field">
             <GasFieldLabel label="Priority fee (gwei)" tip={GAS_FIELD_TIPS.priorityFee} />
             <input
               type="text"
@@ -433,7 +433,7 @@ function GasFeeBar({
               }
             />
           </label>
-          <label className="bfox-tx-approval__gas-fee-field">
+          <label className="l33t-tx-approval__gas-fee-field">
             <GasFieldLabel label="Gas limit" tip={GAS_FIELD_TIPS.gasLimit} />
             <input
               type="text"
@@ -446,7 +446,7 @@ function GasFeeBar({
             />
           </label>
 
-          {validationErr ? <p className="error bfox-tx-approval__gas-fee-err">{validationErr}</p> : null}
+          {validationErr ? <p className="error l33t-tx-approval__gas-fee-err">{validationErr}</p> : null}
         </div>
       ) : null}
     </div>
@@ -551,17 +551,17 @@ function ApprovalContent({
 
   return (
     <>
-      <div className="bfox-tx-approval__body">
+      <div className="l33t-tx-approval__body">
         {hostname ? (
-          <p className="bfox-tx-approval__site">
+          <p className="l33t-tx-approval__site">
             Request from <strong>{hostname}</strong>
             {pending.origin ? (
-              <span className="bfox-tx-approval__origin muted"> · {pending.origin}</span>
+              <span className="l33t-tx-approval__origin muted"> · {pending.origin}</span>
             ) : null}
           </p>
         ) : null}
         {chain ? (
-          <p className="bfox-tx-approval__chain muted">
+          <p className="l33t-tx-approval__chain muted">
             Network · {chain.name} (chainId {pending.chainId})
           </p>
         ) : null}
@@ -575,11 +575,11 @@ function ApprovalContent({
           />
         ) : null}
 
-        <p className="bfox-tx-approval__dev-note muted">
+        <p className="l33t-tx-approval__dev-note muted">
           Developer view — inspect gas, calldata, and raw RPC params before signing.
         </p>
 
-        <div className="bfox-tx-approval__sections">
+        <div className="l33t-tx-approval__sections">
           {sections.map(section =>
             section.id === 'tx-overview' ? (
               <OverviewSection
@@ -663,16 +663,16 @@ export function TxApprovalSheet({ settings }: { settings: AppSettings }) {
   }
 
   return (
-    <div className="jumpa-sheet-mount bfox-tx-approval">
-      <div className="jumpa-sheet-backdrop" aria-hidden />
+    <div className="leet-sheet-mount l33t-tx-approval">
+      <div className="leet-sheet-backdrop" aria-hidden />
       <div
-        className="jumpa-sheet-panel bfox-tx-approval__panel"
+        className="leet-sheet-panel l33t-tx-approval__panel"
         role="dialog"
         aria-modal="true"
         aria-labelledby="tx-approval-title"
       >
-        <div className="jumpa-sheet-head">
-          <h2 id="tx-approval-title" className="jumpa-sheet-h2">
+        <div className="leet-sheet-head">
+          <h2 id="tx-approval-title" className="leet-sheet-h2">
             {title}
           </h2>
         </div>
@@ -685,12 +685,12 @@ export function TxApprovalSheet({ settings }: { settings: AppSettings }) {
           onGasOverridesChange={setGasOverrides}
         />
 
-        {err ? <p className="error bfox-tx-approval__err">{err}</p> : null}
+        {err ? <p className="error l33t-tx-approval__err">{err}</p> : null}
 
-        <div className="bfox-tx-approval__actions">
+        <div className="l33t-tx-approval__actions">
           <button
             type="button"
-            className="bfox-tx-approval__reject"
+            className="l33t-tx-approval__reject"
             disabled={busy}
             onClick={() => void onDecision(false)}
           >
@@ -698,7 +698,7 @@ export function TxApprovalSheet({ settings }: { settings: AppSettings }) {
           </button>
           <button
             type="button"
-            className="bfox-tx-approval__approve"
+            className="l33t-tx-approval__approve"
             disabled={busy || confirmBlocked}
             onClick={() => void onDecision(true)}
           >

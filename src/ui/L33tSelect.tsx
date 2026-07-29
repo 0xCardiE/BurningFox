@@ -1,16 +1,16 @@
 import { useEffect, useRef } from 'react';
-import { JumpaLiFiIcon } from './JumpaLiFiIcon';
+import { LeetLiFiIcon } from './LeetLiFiIcon';
 
-export type BfoxSelectOption = {
+export type L33tSelectOption = {
   value: string;
   label: string;
   sublabel?: string;
   logoURI?: string;
 };
 
-export type BfoxSelectGroup = {
+export type L33tSelectGroup = {
   label: string;
-  options: BfoxSelectOption[];
+  options: L33tSelectOption[];
 };
 
 function ChevronDownIcon() {
@@ -50,10 +50,10 @@ function CheckIcon() {
 }
 
 function OptionLogo({ logoURI, label }: { logoURI?: string; label: string }) {
-  return <JumpaLiFiIcon logoURI={logoURI} label={label} size={24} rounded />;
+  return <LeetLiFiIcon logoURI={logoURI} label={label} size={24} rounded />;
 }
 
-export function BfoxSelect({
+export function L33tSelect({
   id,
   label,
   openMenu,
@@ -75,7 +75,7 @@ export function BfoxSelect({
   triggerLabel: string;
   triggerSublabel?: string;
   triggerLogoURI?: string;
-  groups: BfoxSelectGroup[];
+  groups: L33tSelectGroup[];
   onPick: (value: string) => void;
   disabled?: boolean;
   panelMaxHeight?: number;
@@ -101,47 +101,54 @@ export function BfoxSelect({
     return () => window.removeEventListener('keydown', onKey);
   }, [open, setOpenMenu]);
 
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpenMenu(null);
+    window.addEventListener('scroll', close, true);
+    return () => window.removeEventListener('scroll', close, true);
+  }, [open, setOpenMenu]);
+
   return (
     <div
       ref={rootRef}
-      className={`bfox-dd${open ? ' bfox-dd--open' : ''}`}
+      className={`l33t-dd${open ? ' l33t-dd--open' : ''}`}
     >
-      <span className="bfox-dd__label">{label}</span>
+      <span className="l33t-dd__label">{label}</span>
       <button
         type="button"
-        className={`bfox-dd__trigger${open ? ' bfox-dd__trigger--open' : ''}`}
+        className={`l33t-dd__trigger${open ? ' l33t-dd__trigger--open' : ''}`}
         disabled={disabled}
         aria-expanded={open}
         aria-haspopup="listbox"
         title={triggerSublabel ?? triggerLabel}
         onClick={() => setOpenMenu(open ? null : id)}
       >
-        <span className="bfox-dd__trigger-main">
+        <span className="l33t-dd__trigger-main">
           {triggerLogoURI ? (
             <OptionLogo logoURI={triggerLogoURI} label={triggerLabel} />
           ) : null}
-          <span className="bfox-dd__trigger-text">
-            <span className="bfox-dd__trigger-value">{triggerLabel}</span>
+          <span className="l33t-dd__trigger-text">
+            <span className="l33t-dd__trigger-value">{triggerLabel}</span>
             {triggerSublabel ? (
-              <span className="bfox-dd__trigger-sub">{triggerSublabel}</span>
+              <span className="l33t-dd__trigger-sub">{triggerSublabel}</span>
             ) : null}
           </span>
         </span>
-        <span className="bfox-dd__chev" aria-hidden>
+        <span className="l33t-dd__chev" aria-hidden>
           <ChevronDownIcon />
         </span>
       </button>
       {open ? (
         <div
-          className="bfox-dd__panel"
+          className="l33t-dd__panel"
           role="listbox"
           aria-label={label}
           style={{ maxHeight: panelMaxHeight }}
         >
           {groups.map(group => (
-            <div key={group.label} className="bfox-dd__group">
+            <div key={group.label} className="l33t-dd__group">
               {groups.length > 1 ? (
-                <div className="bfox-dd__group-label">{group.label}</div>
+                <div className="l33t-dd__group-label">{group.label}</div>
               ) : null}
               {group.options.map(opt => {
                 const selected = opt.value === value;
@@ -151,24 +158,24 @@ export function BfoxSelect({
                     type="button"
                     role="option"
                     aria-selected={selected}
-                    className={`bfox-dd__option${selected ? ' bfox-dd__option--on' : ''}`}
+                    className={`l33t-dd__option${selected ? ' l33t-dd__option--on' : ''}`}
                     title={opt.sublabel ?? opt.label}
                     onClick={() => {
                       onPick(opt.value);
                       setOpenMenu(null);
                     }}
                   >
-                    <span className="bfox-dd__option-main">
+                    <span className="l33t-dd__option-main">
                       <OptionLogo logoURI={opt.logoURI} label={opt.label} />
-                      <span className="bfox-dd__option-text">
-                        <span className="bfox-dd__option-label">{opt.label}</span>
+                      <span className="l33t-dd__option-text">
+                        <span className="l33t-dd__option-label">{opt.label}</span>
                         {opt.sublabel ? (
-                          <span className="bfox-dd__option-sub">{opt.sublabel}</span>
+                          <span className="l33t-dd__option-sub">{opt.sublabel}</span>
                         ) : null}
                       </span>
                     </span>
                     {selected ? (
-                      <span className="bfox-dd__check" aria-hidden>
+                      <span className="l33t-dd__check" aria-hidden>
                         <CheckIcon />
                       </span>
                     ) : null}
@@ -183,7 +190,7 @@ export function BfoxSelect({
   );
 }
 
-export function BfoxSegmented({
+export function L33tSegmented({
   value,
   onChange,
   options,
@@ -200,7 +207,7 @@ export function BfoxSegmented({
 }) {
   return (
     <div
-      className={`bfox-seg${className ? ` ${className}` : ''}`}
+      className={`l33t-seg${className ? ` ${className}` : ''}`}
       role="tablist"
       aria-label={ariaLabel}
       title={title}
@@ -211,7 +218,7 @@ export function BfoxSegmented({
           type="button"
           role="tab"
           aria-selected={value === opt.value}
-          className={`bfox-seg__btn${value === opt.value ? ' bfox-seg__btn--on' : ''}`}
+          className={`l33t-seg__btn${value === opt.value ? ' l33t-seg__btn--on' : ''}`}
           onClick={() => onChange(opt.value)}
         >
           {opt.label}

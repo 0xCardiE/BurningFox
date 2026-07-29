@@ -10,7 +10,7 @@ import {
   loadWalletBalancesForChain,
   type WalletBalEntry,
 } from '../lib/walletBalances';
-import { JumpaLiFiIcon } from './JumpaLiFiIcon';
+import { LeetLiFiIcon } from './LeetLiFiIcon';
 import { QuickSendInline } from './QuickSendInline';
 
 function tokenRowKey(t: WalletBalEntry): string {
@@ -60,49 +60,49 @@ export function WalletHomeView({
   }
 
   return (
-    <div className="bfox-home">
-      <div className="bfox-home-toolbar">
-        <button type="button" className="ghost bfox-refresh-btn" onClick={() => void refresh()} disabled={busy}>
+    <div className="l33t-home">
+      <div className="l33t-home-toolbar">
+        <button type="button" className="ghost l33t-refresh-btn" onClick={() => void refresh()} disabled={busy}>
           {busy ? '…' : 'Refresh'}
         </button>
       </div>
 
-      <div className="bfox-token-list-head">
+      <div className="l33t-token-list-head">
         <span>Tokens on {chain?.name ?? chainId}</span>
-        <span className="muted bfox-token-list-hint">Tap a token to send inline</span>
+        <span className="muted l33t-token-list-hint">Tap a token to send inline</span>
       </div>
 
-      {err ? <p className="error bfox-home-error">{err}</p> : null}
+      {err ? <p className="error l33t-home-error">{err}</p> : null}
 
       {busy && rows.length === 0 ? (
-        <p className="muted bfox-home-loading">Loading balances…</p>
+        <p className="muted l33t-home-loading">Loading balances…</p>
       ) : null}
 
       {!busy && rows.length === 0 && !err ? (
-        <p className="muted bfox-home-empty">No tokens with balance on this network.</p>
+        <p className="muted l33t-home-empty">No tokens with balance on this network.</p>
       ) : null}
 
-      <ul className="bfox-token-list">
+      <ul className="l33t-token-list">
         {rows.map(t => {
           const usd = fmtUsdValue(t);
           const key = tokenRowKey(t);
           const open = expandedKey === key;
           return (
-            <li key={key} className={`bfox-token-item${open ? ' bfox-token-item--open' : ''}`}>
+            <li key={key} className={`l33t-token-item${open ? ' l33t-token-item--open' : ''}`}>
               <button
                 type="button"
-                className="bfox-token-row bfox-token-row--action"
+                className="l33t-token-row l33t-token-row--action"
                 aria-expanded={open}
                 onClick={() => toggleSend(t)}
               >
-                <JumpaLiFiIcon logoURI={t.logoURI} label={t.symbol} size={40} rounded />
-                <div className="bfox-token-row__meta">
-                  <span className="bfox-token-row__name">{t.name || t.symbol}</span>
-                  <span className="bfox-token-row__sym">{t.symbol}</span>
+                <LeetLiFiIcon logoURI={t.logoURI} label={t.symbol} size={40} rounded />
+                <div className="l33t-token-row__meta">
+                  <span className="l33t-token-row__name">{t.name || t.symbol}</span>
+                  <span className="l33t-token-row__sym">{t.symbol}</span>
                 </div>
-                <div className="bfox-token-row__vals">
-                  <span className="bfox-token-row__usd">{usd ?? '—'}</span>
-                  <span className="bfox-token-row__amt">
+                <div className="l33t-token-row__vals">
+                  <span className="l33t-token-row__usd">{usd ?? '—'}</span>
+                  <span className="l33t-token-row__amt">
                     {fmtTokenAmount(t)} {t.symbol}
                   </span>
                 </div>

@@ -23,7 +23,7 @@ import {
 } from '../lib/storageState';
 import { appendSwapToHistory } from '../lib/swapHistory';
 import { transactionExplorerUrl } from '../lib/explorerUrls';
-import { BfoxSelect, type BfoxSelectGroup } from './BfoxSelect';
+import { L33tSelect, type L33tSelectGroup } from './L33tSelect';
 type BalEntry = {
   address: string;
   symbol: string;
@@ -204,7 +204,7 @@ export function GasStationView({ settings }: { settings: AppSettings }) {
     []
   );
 
-  const chainGroups = useMemo((): BfoxSelectGroup[] => {
+  const chainGroups = useMemo((): L33tSelectGroup[] => {
     const opts = chainChoices.map(id => {
       const c = chainById.get(id);
       return {
@@ -219,7 +219,7 @@ export function GasStationView({ settings }: { settings: AppSettings }) {
     return [{ label: 'Networks', options: opts }];
   }, [balancesRecord, chainById, chainChoices]);
 
-  const tokenGroups = useMemo((): BfoxSelectGroup[] => {
+  const tokenGroups = useMemo((): L33tSelectGroup[] => {
     const opts = sourceTokenChoices.map(t => ({
       value: t.address,
       label: t.symbol,
@@ -368,7 +368,7 @@ export function GasStationView({ settings }: { settings: AppSettings }) {
   };
 
   if (!addr) {
-    return <p className="bfox-tools-empty muted">Unlock wallet to use Gas Station.</p>;
+    return <p className="l33t-tools-empty muted">Unlock wallet to use Gas Station.</p>;
   }
 
   const destChain = destChainId != null ? chainById.get(destChainId) : undefined;
@@ -401,8 +401,8 @@ export function GasStationView({ settings }: { settings: AppSettings }) {
       : undefined;
 
   return (
-    <div className="bfox-send-panel bfox-gas-station">
-      <BfoxSelect
+    <div className="l33t-send-panel l33t-gas-station">
+      <L33tSelect
         id="gas-dest-chain"
         label="Need gas on"
         openMenu={openMenu}
@@ -435,7 +435,7 @@ export function GasStationView({ settings }: { settings: AppSettings }) {
         Destination chain native token — e.g. ETH on Ethereum, POL on Polygon, not a generic gas estimate.
       </p>
 
-      <BfoxSelect
+      <L33tSelect
         id="gas-source-chain"
         label="Pay from chain"
         openMenu={openMenu}
@@ -451,7 +451,7 @@ export function GasStationView({ settings }: { settings: AppSettings }) {
         }}
       />
 
-      <BfoxSelect
+      <L33tSelect
         id="gas-source-token"
         label="Pay with token"
         openMenu={openMenu}
@@ -477,25 +477,25 @@ export function GasStationView({ settings }: { settings: AppSettings }) {
       {quoteErr ? <p className="error">{quoteErr}</p> : null}
 
       {quote ? (
-        <div className="bfox-gas-quote">
-          <div className="bfox-gas-quote__row">
+        <div className="l33t-gas-quote">
+          <div className="l33t-gas-quote__row">
             <span>You pay</span>
             <strong>
               {quotePay} {sourceToken?.symbol}
             </strong>
           </div>
-          <div className="bfox-gas-quote__row">
+          <div className="l33t-gas-quote__row">
             <span>You receive</span>
             <strong>
               ≥ {quoteReceive} {nativeSym}
             </strong>
           </div>
-          <div className="bfox-gas-quote__row muted">
+          <div className="l33t-gas-quote__row muted">
             <span>Route</span>
             <span>{formatToolRoute(quote)}</span>
           </div>
           {quote.estimate.feeCosts?.length ? (
-            <div className="bfox-gas-quote__row muted">
+            <div className="l33t-gas-quote__row muted">
               <span>Fees</span>
               <span>
                 {quote.estimate.feeCosts
@@ -511,11 +511,11 @@ export function GasStationView({ settings }: { settings: AppSettings }) {
       ) : null}
 
       {execLog ? (
-        <div className="jumpa-exec-log" style={{ marginTop: 12 }}>
-          <p className="jumpa-exec-log__text">{execLog}</p>
+        <div className="leet-exec-log" style={{ marginTop: 12 }}>
+          <p className="leet-exec-log__text">{execLog}</p>
           {execUrl ? (
-            <p className="jumpa-exec-log__sub">
-              <a href={execUrl} target="_blank" rel="noopener noreferrer" className="jumpa-tx-link">
+            <p className="leet-exec-log__sub">
+              <a href={execUrl} target="_blank" rel="noopener noreferrer" className="leet-tx-link">
                 Open in explorer ↗
               </a>
             </p>
@@ -523,7 +523,7 @@ export function GasStationView({ settings }: { settings: AppSettings }) {
         </div>
       ) : null}
 
-      <div className="bfox-gas-actions">
+      <div className="l33t-gas-actions">
         <button
           type="button"
           disabled={quoteBusy || execBusy || !sourceToken || !destNative}

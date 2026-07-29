@@ -9,8 +9,8 @@ export function ScreenFade({
   children: ReactNode;
 }) {
   return (
-    <div key={routeKey} className="jumpa-route-root">
-      <div className="jumpa-route-layer">{children}</div>
+    <div key={routeKey} className="leet-route-root">
+      <div className="leet-route-layer">{children}</div>
     </div>
   );
 }

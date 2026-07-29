@@ -145,7 +145,7 @@ export function SettingsView({
   }
 
   return (
-    <div className="wallet-shell bfox">
+    <div className="wallet-shell l33t">
       <ScreenHeader title="Settings" onClose={onBack} />
       <div className="screen-body settings-panel">
         <div className="settings-body">
@@ -233,7 +233,7 @@ export function SettingsView({
           </p>
 
           {onOpenNetworks ? (
-            <div className="bfox-settings-link-card">
+            <div className="l33t-settings-link-card">
               <div>
                 <strong>Networks &amp; RPCs</strong>
                 <p className="muted" style={{ margin: '4px 0 0', fontSize: 12 }}>
@@ -279,7 +279,7 @@ export function SettingsView({
           </select>
           <p className="muted" style={{ fontSize: 12 }}>
             {sidePanelSupported
-              ? 'Side panel opens BurnBox in the browser sidebar when you click the extension icon (default).'
+              ? 'Side panel opens 1337 in the browser sidebar when you click the extension icon (default).'
               : 'Side panel requires a Chromium browser with side panel support (e.g. Chrome 114+).'}
           </p>
 
@@ -308,10 +308,10 @@ export function SettingsView({
             onChange={e => setReplaceMetaMask(e.target.value === 'replace')}
           >
             <option value="replace">Replace MetaMask (window.ethereum)</option>
-            <option value="separate">Separate provider (window.burnBox only)</option>
+            <option value="separate">Separate provider (window.l33t only)</option>
           </select>
           <p className="muted" style={{ fontSize: 12 }}>
-            When enabled, sites that offer MetaMask will connect to BurnBox instead. Reload open
+            When enabled, sites that offer MetaMask will connect to 1337 instead. Reload open
             tabs after changing this.
           </p>
 
@@ -336,7 +336,7 @@ export function SettingsView({
                 browser restart.
               </li>
               <li>
-                Swaps and balances use LI.FI and public RPCs — nothing is sent to a BurnBox
+                Swaps and balances use LI.FI and public RPCs — nothing is sent to a 1337
                 server.
               </li>
             </ul>

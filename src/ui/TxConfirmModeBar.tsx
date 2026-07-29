@@ -1,4 +1,4 @@
-import { BfoxSegmented } from './BfoxSelect';
+import { L33tSegmented } from './L33tSelect';
 import {
   effectiveTxConfirmMode,
   patchSettings,
@@ -26,8 +26,8 @@ export function TxConfirmModeToggle({
   }
 
   return (
-    <BfoxSegmented
-      className="bfox-seg--compact"
+    <L33tSegmented
+      className="l33t-seg--compact"
       value={mode}
       onChange={onChange}
       ariaLabel="Transaction confirmation mode"

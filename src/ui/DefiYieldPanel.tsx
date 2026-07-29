@@ -7,12 +7,12 @@ import {
   type LlamaYieldDataset,
 } from '../lib/defiLlamaYields';
 import type { VaultOpportunity } from '../lib/vaultOpportunity';
-import { JumpaLiFiIcon } from './JumpaLiFiIcon';
+import { LeetLiFiIcon } from './LeetLiFiIcon';
 
 function ExternalLinkIcon() {
   return (
     <svg
-      className="jumpa-defi-external__svg"
+      className="leet-defi-external__svg"
       xmlns="http://www.w3.org/2000/svg"
       width={18}
       height={18}
@@ -90,7 +90,7 @@ function DefiDdOption({
       type="button"
       role="option"
       aria-selected={selected}
-      className={`jumpa-defi-dd__option${selected ? ' jumpa-defi-dd__option--on' : ''}`}
+      className={`leet-defi-dd__option${selected ? ' leet-defi-dd__option--on' : ''}`}
       onClick={onPick}
     >
       {children}
@@ -141,25 +141,25 @@ function DefiFilterDd({
   return (
     <div
       ref={rootRef}
-      className={`jumpa-defi-filter jumpa-defi-dd${open ? ' jumpa-defi-dd--open' : ''}`}
+      className={`leet-defi-filter leet-defi-dd${open ? ' leet-defi-dd--open' : ''}`}
     >
-      <span className="jumpa-defi-filter__label">{label}</span>
+      <span className="leet-defi-filter__label">{label}</span>
       <button
         type="button"
-        className={`jumpa-defi-dd__trigger${open ? ' jumpa-defi-dd__trigger--open' : ''}`}
+        className={`leet-defi-dd__trigger${open ? ' leet-defi-dd__trigger--open' : ''}`}
         disabled={disabled}
         aria-expanded={open}
         aria-haspopup="listbox"
         title={title}
         onClick={() => setOpenMenu(open ? null : id)}
       >
-        <span className="jumpa-defi-dd__value">{triggerText}</span>
-        <span className="jumpa-defi-dd__chev" aria-hidden>
+        <span className="leet-defi-dd__value">{triggerText}</span>
+        <span className="leet-defi-dd__chev" aria-hidden>
           <ChevronDownIcon />
         </span>
       </button>
       {open ? (
-        <div className="jumpa-defi-dd__panel" role="listbox">
+        <div className="leet-defi-dd__panel" role="listbox">
           {children}
         </div>
       ) : null}
@@ -240,10 +240,10 @@ export function DefiYieldPanel() {
   const close = () => setOpenMenu(null);
 
   return (
-    <div className="jumpa-defi">
-      <p className="jumpa-defi__powered">Powered by Li.Fi and Vaults.fyi</p>
+    <div className="leet-defi">
+      <p className="leet-defi__powered">Powered by Li.Fi and Vaults.fyi</p>
       {showFilters ? (
-        <div className="jumpa-defi__filters" role="search" aria-label="Filter yield pools">
+        <div className="leet-defi__filters" role="search" aria-label="Filter yield pools">
           <DefiFilterDd
             label="Chain"
             id="chain"
@@ -331,34 +331,34 @@ export function DefiYieldPanel() {
           </DefiFilterDd>
         </div>
       ) : null}
-      {err ? <p className="error jumpa-defi__err">{err}</p> : null}
+      {err ? <p className="error leet-defi__err">{err}</p> : null}
       {showLoading ? (
-        <p className="muted jumpa-defi__loading">Loading yield data…</p>
+        <p className="muted leet-defi__loading">Loading yield data…</p>
       ) : null}
       {showEmpty ? (
-        <p className="muted jumpa-defi__empty">No pools matched the filters.</p>
+        <p className="muted leet-defi__empty">No pools matched the filters.</p>
       ) : null}
       {rows.length > 0 ? (
-        <ul className="jumpa-defi__list">
+        <ul className="leet-defi__list">
           {rows.map(v => {
             const depositLabel = v.asset?.trim();
             const category = v.protocolCategory?.trim();
             return (
-              <li key={v.id} className="jumpa-defi-card">
-                <div className="jumpa-defi-card__head">
-                  <JumpaLiFiIcon logoURI={v.protocolLogo} label={v.protocol} size={40} rounded />
-                  <div className="jumpa-defi-card__titles">
-                    <span className="jumpa-defi-card__protocol">{v.protocol}</span>
-                    <span className="muted jumpa-defi-card__chain">{v.chain}</span>
+              <li key={v.id} className="leet-defi-card">
+                <div className="leet-defi-card__head">
+                  <LeetLiFiIcon logoURI={v.protocolLogo} label={v.protocol} size={40} rounded />
+                  <div className="leet-defi-card__titles">
+                    <span className="leet-defi-card__protocol">{v.protocol}</span>
+                    <span className="muted leet-defi-card__chain">{v.chain}</span>
                   </div>
                   {category || v.depositUrl ? (
-                    <div className="jumpa-defi-card__head-aside">
+                    <div className="leet-defi-card__head-aside">
                       {category ? (
-                        <span className="jumpa-defi-card__category-pill">{category}</span>
+                        <span className="leet-defi-card__category-pill">{category}</span>
                       ) : null}
                       {v.depositUrl ? (
                         <a
-                          className="jumpa-defi-external"
+                          className="leet-defi-external"
                           href={v.depositUrl}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -372,29 +372,29 @@ export function DefiYieldPanel() {
                   ) : null}
                 </div>
                 <div
-                  className={`jumpa-defi-card__metrics${
-                    depositLabel ? ' jumpa-defi-card__metrics--3' : ' jumpa-defi-card__metrics--2'
+                  className={`leet-defi-card__metrics${
+                    depositLabel ? ' leet-defi-card__metrics--3' : ' leet-defi-card__metrics--2'
                   }`}
                 >
                   <div title="APY (DefiLlama)">
-                    <span className="jumpa-defi-card__k">APY</span>
-                    <span className="jumpa-defi-card__v">{fmtPct(v.apy)}</span>
+                    <span className="leet-defi-card__k">APY</span>
+                    <span className="leet-defi-card__v">{fmtPct(v.apy)}</span>
                   </div>
                   <div>
-                    <span className="jumpa-defi-card__k">TVL</span>
-                    <span className="jumpa-defi-card__v">{fmtTvlUsd(v.tvlUsd)}</span>
+                    <span className="leet-defi-card__k">TVL</span>
+                    <span className="leet-defi-card__v">{fmtTvlUsd(v.tvlUsd)}</span>
                   </div>
                   {depositLabel ? (
                     <div title="Asset to deposit">
-                      <span className="jumpa-defi-card__k">Deposit</span>
-                      <span className="jumpa-defi-card__v">{depositLabel}</span>
+                      <span className="leet-defi-card__k">Deposit</span>
+                      <span className="leet-defi-card__v">{depositLabel}</span>
                     </div>
                   ) : null}
                 </div>
-                <div className="jumpa-defi-card__actions">
+                <div className="leet-defi-card__actions">
                   <button
                     type="button"
-                    className="jumpa-defi-deposit"
+                    className="leet-defi-deposit"
                     title="Coming soon"
                     onClick={() => {}}
                   >

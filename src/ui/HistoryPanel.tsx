@@ -24,7 +24,7 @@ import {
   type TxFailureDetail,
 } from '../lib/txFailureDetail';
 import { describeError } from '../lib/utils';
-import { JumpaLiFiIcon } from './JumpaLiFiIcon';
+import { LeetLiFiIcon } from './LeetLiFiIcon';
 
 type TxKind = 'sent' | 'received' | 'self' | 'contract';
 
@@ -138,7 +138,7 @@ function explorerName(chainId: number): string {
 }
 
 function TxDirectionIcon({ kind }: { kind: TxKind }) {
-  const cls = `bfox-tx-history__dir-icon bfox-tx-history__dir-icon--${kind}`;
+  const cls = `l33t-tx-history__dir-icon l33t-tx-history__dir-icon--${kind}`;
   if (kind === 'received') {
     return (
       <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -203,12 +203,12 @@ function DetailRow({
   }
 
   return (
-    <div className="bfox-tx-fail__row">
-      <span className="bfox-tx-fail__label">{label}</span>
-      <div className="bfox-tx-fail__value-wrap">
-        <span className={`bfox-tx-fail__value${mono ? ' mono' : ''}`}>{value}</span>
+    <div className="l33t-tx-fail__row">
+      <span className="l33t-tx-fail__label">{label}</span>
+      <div className="l33t-tx-fail__value-wrap">
+        <span className={`l33t-tx-fail__value${mono ? ' mono' : ''}`}>{value}</span>
         {copyable ? (
-          <button type="button" className="bfox-tx-fail__copy" onClick={() => void copy()}>
+          <button type="button" className="l33t-tx-fail__copy" onClick={() => void copy()}>
             {copied ? 'Copied' : 'Copy'}
           </button>
         ) : null}
@@ -263,15 +263,15 @@ function FailedTxDetail({
   }
 
   return (
-    <div className="bfox-tx-fail">
-      <div className="bfox-tx-fail__banner">
+    <div className="l33t-tx-fail">
+      <div className="l33t-tx-fail__banner">
         <strong>Transaction failed</strong>
         {busy ? <span className="muted"> Decoding revert…</span> : null}
         {!busy && detail?.revertReason ? (
-          <p className="bfox-tx-fail__reason">{detail.revertReason}</p>
+          <p className="l33t-tx-fail__reason">{detail.revertReason}</p>
         ) : null}
         {!busy && !detail?.revertReason && !err ? (
-          <p className="bfox-tx-fail__reason muted">
+          <p className="l33t-tx-fail__reason muted">
             No revert string recovered — see RPC / calldata below.
           </p>
         ) : null}
@@ -279,7 +279,7 @@ function FailedTxDetail({
       </div>
 
       {detail ? (
-        <div className="bfox-tx-fail__grid">
+        <div className="l33t-tx-fail__grid">
           <DetailRow label="Status" value={detail.status} />
           <DetailRow
             label="Hash"
@@ -324,13 +324,13 @@ function FailedTxDetail({
             copyable
           />
           {detail.input && detail.input.length > 98 ? (
-            <details className="bfox-tx-fail__raw">
+            <details className="l33t-tx-fail__raw">
               <summary>Full calldata</summary>
               <pre className="mono">{detail.input}</pre>
             </details>
           ) : null}
           {detail.rpcError ? (
-            <details className="bfox-tx-fail__raw" open>
+            <details className="l33t-tx-fail__raw" open>
               <summary>RPC error</summary>
               <pre>{detail.rpcError}</pre>
             </details>
@@ -338,12 +338,12 @@ function FailedTxDetail({
         </div>
       ) : null}
 
-      <div className="bfox-tx-fail__actions">
-        <button type="button" className="bfox-tx-fail__btn" disabled={!detail} onClick={() => void copyAll()}>
+      <div className="l33t-tx-fail__actions">
+        <button type="button" className="l33t-tx-fail__btn" disabled={!detail} onClick={() => void copyAll()}>
           {copiedAll ? 'Copied debug dump' : 'Copy all for debug'}
         </button>
         {url ? (
-          <a className="bfox-tx-fail__btn bfox-tx-fail__btn--link" href={url} target="_blank" rel="noopener noreferrer">
+          <a className="l33t-tx-fail__btn l33t-tx-fail__btn--link" href={url} target="_blank" rel="noopener noreferrer">
             Open on {explorerLabel}
           </a>
         ) : null}
@@ -378,45 +378,45 @@ function TxHistoryRowItem({
   const failed = !row.success;
 
   return (
-    <li className={`bfox-tx-history__item${failed ? ' bfox-tx-history__item--failed' : ''}${expanded ? ' bfox-tx-history__item--open' : ''}`}>
+    <li className={`l33t-tx-history__item${failed ? ' l33t-tx-history__item--failed' : ''}${expanded ? ' l33t-tx-history__item--open' : ''}`}>
       <button
         type="button"
-        className="bfox-tx-history__row-btn"
+        className="l33t-tx-history__row-btn"
         onClick={onToggle}
         aria-expanded={expanded}
       >
-        <div className="bfox-tx-history__icon-wrap">
-          <span className={`bfox-tx-history__icon bfox-tx-history__icon--${kind}`}>
+        <div className="l33t-tx-history__icon-wrap">
+          <span className={`l33t-tx-history__icon l33t-tx-history__icon--${kind}`}>
             <TxDirectionIcon kind={kind} />
           </span>
-          <span className="bfox-tx-history__chain-badge" title={chainName}>
-            <JumpaLiFiIcon logoURI={chainLogo} label={chainName} size={14} rounded />
+          <span className="l33t-tx-history__chain-badge" title={chainName}>
+            <LeetLiFiIcon logoURI={chainLogo} label={chainName} size={14} rounded />
           </span>
         </div>
 
-        <div className="bfox-tx-history__main">
-          <span className="bfox-tx-history__title">{title}</span>
-          <span className="bfox-tx-history__subtitle">{subtitle}</span>
+        <div className="l33t-tx-history__main">
+          <span className="l33t-tx-history__title">{title}</span>
+          <span className="l33t-tx-history__subtitle">{subtitle}</span>
           {failed ? (
-            <span className="bfox-tx-history__failed-tag">
+            <span className="l33t-tx-history__failed-tag">
               Failed{row.methodId ? ` · ${row.methodId}` : ''} · tap for details
             </span>
           ) : null}
         </div>
 
-        <div className="bfox-tx-history__right">
+        <div className="l33t-tx-history__right">
           {amount ? (
             <span
-              className={`bfox-tx-history__amount${
-                row.direction === 'in' ? ' bfox-tx-history__amount--in' : ''
+              className={`l33t-tx-history__amount${
+                row.direction === 'in' ? ' l33t-tx-history__amount--in' : ''
               }`}
             >
               {amount}
             </span>
           ) : (
-            <span className="bfox-tx-history__amount bfox-tx-history__amount--empty">—</span>
+            <span className="l33t-tx-history__amount l33t-tx-history__amount--empty">—</span>
           )}
-          <span className="bfox-tx-history__time">
+          <span className="l33t-tx-history__time">
             {new Date(row.timestamp).toLocaleTimeString(undefined, {
               hour: 'numeric',
               minute: '2-digit',
@@ -427,7 +427,7 @@ function TxHistoryRowItem({
 
       {url ? (
         <a
-          className="bfox-tx-history__explorer"
+          className="l33t-tx-history__explorer"
           href={url}
           target="_blank"
           rel="noopener noreferrer"
@@ -440,11 +440,11 @@ function TxHistoryRowItem({
       ) : null}
 
       {expanded ? (
-        <div className="bfox-tx-history__detail">
+        <div className="l33t-tx-history__detail">
           {failed ? (
             <FailedTxDetail chainId={chainId} row={row} explorerLabel={explorerLabel} />
           ) : (
-            <div className="bfox-tx-fail bfox-tx-fail--ok">
+            <div className="l33t-tx-fail l33t-tx-fail--ok">
               <DetailRow label="Hash" value={row.hash} mono copyable />
               <DetailRow label="Block" value={row.blockNumber != null ? String(row.blockNumber) : null} />
               <DetailRow label="Nonce" value={row.nonce != null ? String(row.nonce) : null} />
@@ -464,7 +464,7 @@ function TxHistoryRowItem({
                     : null
                 }
               />
-              <p className="bfox-tx-fail__hint muted">
+              <p className="l33t-tx-fail__hint muted">
                 {shortHash(row.hash)}
                 {url ? (
                   <>
@@ -610,12 +610,12 @@ export function HistoryPanel({ settings }: { settings: AppSettings }) {
   }
 
   if (!addr) {
-    return <p className="bfox-tools-empty muted">Unlock wallet to view transaction history.</p>;
+    return <p className="l33t-tools-empty muted">Unlock wallet to view transaction history.</p>;
   }
 
   if (needsExplorerApiKey(chainId) && !apiKey) {
     return (
-      <p className="bfox-tools-empty muted">
+      <p className="l33t-tools-empty muted">
         Add a free <strong>Etherscan API key</strong> in Settings to load transaction history on{' '}
         {chain?.name ?? chainId}. One key works across Etherscan-family chains (Ethereum, Base,
         Arbitrum, …).
@@ -624,15 +624,15 @@ export function HistoryPanel({ settings }: { settings: AppSettings }) {
   }
 
   return (
-    <div className="bfox-tx-history">
-      <div className="bfox-tx-history__head">
-        <div className="bfox-tx-history__head-main">
+    <div className="l33t-tx-history">
+      <div className="l33t-tx-history__head">
+        <div className="l33t-tx-history__head-main">
           {chainLogo ? (
-            <JumpaLiFiIcon logoURI={chainLogo} label={chain?.name} size={28} rounded />
+            <LeetLiFiIcon logoURI={chainLogo} label={chain?.name} size={28} rounded />
           ) : null}
           <div>
-            <p className="bfox-tx-history__head-title">{chain?.name ?? `Chain ${chainId}`}</p>
-            <p className="bfox-tx-history__head-sub muted">
+            <p className="l33t-tx-history__head-title">{chain?.name ?? `Chain ${chainId}`}</p>
+            <p className="l33t-tx-history__head-sub muted">
               {rows.length > 0
                 ? `${rows.length} tx${rows.length === 1 ? '' : 's'}${
                     failedCount ? ` · ${failedCount} failed` : ''
@@ -644,7 +644,7 @@ export function HistoryPanel({ settings }: { settings: AppSettings }) {
         </div>
         <button
           type="button"
-          className="bfox-tx-history__refresh"
+          className="l33t-tx-history__refresh"
           disabled={busy}
           onClick={() => void refreshLatest()}
         >
@@ -655,19 +655,19 @@ export function HistoryPanel({ settings }: { settings: AppSettings }) {
       {err ? <p className="error">{err}</p> : null}
 
       {!hydrated || (busy && rows.length === 0) ? (
-        <p className="bfox-tools-empty muted">Loading transactions…</p>
+        <p className="l33t-tools-empty muted">Loading transactions…</p>
       ) : null}
 
       {hydrated && !busy && rows.length === 0 && !err ? (
-        <p className="bfox-tools-empty muted">No transactions found for this address on this network.</p>
+        <p className="l33t-tools-empty muted">No transactions found for this address on this network.</p>
       ) : null}
 
       {rows.length > 0 ? (
-        <div className="bfox-tx-history__groups">
+        <div className="l33t-tx-history__groups">
           {grouped.map(group => (
-            <section key={group.label} className="bfox-tx-history__group">
-              <h3 className="bfox-tx-history__date">{group.label}</h3>
-              <ul className="bfox-tx-history__list">
+            <section key={group.label} className="l33t-tx-history__group">
+              <h3 className="l33t-tx-history__date">{group.label}</h3>
+              <ul className="l33t-tx-history__list">
                 {group.rows.map(row => (
                   <TxHistoryRowItem
                     key={row.hash}
@@ -691,14 +691,14 @@ export function HistoryPanel({ settings }: { settings: AppSettings }) {
       {hasMore ? (
         <button
           type="button"
-          className="bfox-tx-history__load-more"
+          className="l33t-tx-history__load-more"
           disabled={loadingMore || busy}
           onClick={() => void loadMore()}
         >
           {loadingMore ? 'Loading…' : `Load ${TX_HISTORY_PAGE_SIZE} more`}
         </button>
       ) : rows.length > 0 ? (
-        <p className="bfox-tx-history__end muted">End of loaded history</p>
+        <p className="l33t-tx-history__end muted">End of loaded history</p>
       ) : null}
     </div>
   );

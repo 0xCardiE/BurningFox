@@ -25,11 +25,11 @@ import {
   summarizeChainHealth,
 } from '../lib/rpcHealth';
 import { describeError } from '../lib/utils';
-import { BfoxSelect, BfoxSegmented, type BfoxSelectGroup } from './BfoxSelect';
+import { L33tSelect, L33tSegmented, type L33tSelectGroup } from './L33tSelect';
 
 type NetFilter = ChainKind;
 
-function chainGroups(kind: NetFilter): BfoxSelectGroup[] {
+function chainGroups(kind: NetFilter): L33tSelectGroup[] {
   const label = kind === 'mainnet' ? 'Mainnets' : 'Testnets';
   return [{ label, options: chainsByKind(kind).map(chainToOption) }];
 }
@@ -120,7 +120,7 @@ export function NetworkSelector({ settings, onSaved }: Props) {
     [netFilter, settings.customChains],
   );
 
-  const rpcGroups = useMemo<BfoxSelectGroup[]>(
+  const rpcGroups = useMemo<L33tSelectGroup[]>(
     () => [
       {
         label: 'RPC endpoints',
@@ -194,8 +194,8 @@ export function NetworkSelector({ settings, onSaved }: Props) {
   const activeInCatalog = allChains().some(c => c.chainId === activeChainId);
 
   return (
-    <div className="bfox-net-select">
-      <BfoxSegmented
+    <div className="l33t-net-select">
+      <L33tSegmented
         value={netFilter}
         onChange={v => void onFilterChange(v as NetFilter)}
         options={[
@@ -204,9 +204,9 @@ export function NetworkSelector({ settings, onSaved }: Props) {
         ]}
       />
 
-      <div className="bfox-net-select__row">
-        <BfoxSelect
-          id="bfox-chain"
+      <div className="l33t-net-select__row">
+        <L33tSelect
+          id="l33t-chain"
           label="Chain"
           openMenu={openMenu}
           setOpenMenu={setOpenMenu}
@@ -228,8 +228,8 @@ export function NetworkSelector({ settings, onSaved }: Props) {
           onPick={v => void onChainChange(Number(v))}
         />
 
-        <BfoxSelect
-          id="bfox-rpc"
+        <L33tSelect
+          id="l33t-rpc"
           label="RPC"
           openMenu={openMenu}
           setOpenMenu={setOpenMenu}
@@ -243,18 +243,18 @@ export function NetworkSelector({ settings, onSaved }: Props) {
         />
       </div>
 
-      <div className="bfox-rpc-status">
+      <div className="l33t-rpc-status">
         <span
-          className={`bfox-rpc-status__dot bfox-rpc-status__dot--${healthSummary.tone}`}
+          className={`l33t-rpc-status__dot l33t-rpc-status__dot--${healthSummary.tone}`}
           aria-hidden
         />
-        <span className="bfox-rpc-status__text">
+        <span className="l33t-rpc-status__text">
           <strong>{healthSummary.label}</strong>
           <span className="muted"> · {healthSummary.detail}</span>
         </span>
         <button
           type="button"
-          className="bfox-rpc-status__doctor"
+          className="l33t-rpc-status__doctor"
           onClick={() =>
             openNetworkDoctor({
               chainId: activeChainId,
@@ -267,7 +267,7 @@ export function NetworkSelector({ settings, onSaved }: Props) {
         </button>
       </div>
 
-      {err ? <p className="error bfox-net-select__err">{err}</p> : null}
+      {err ? <p className="error l33t-net-select__err">{err}</p> : null}
     </div>
   );
 }

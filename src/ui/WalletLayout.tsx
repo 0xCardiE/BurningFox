@@ -54,7 +54,7 @@ export function WalletLayout({
   const settingsBtn = (
     <button
       type="button"
-      className="bfox-icon-head"
+      className="l33t-icon-head"
       onClick={onOpenSettings}
       aria-label="Settings"
     >
@@ -66,12 +66,12 @@ export function WalletLayout({
   );
 
   return (
-    <div className="wallet-shell bfox bfox--main">
-      <header className="screen-header bfox-main-header">
+    <div className="wallet-shell l33t l33t--main">
+      <header className="screen-header l33t-main-header">
         {addr ? (
           <button
             type="button"
-            className="bfox-main-header__addr mono"
+            className="l33t-main-header__addr mono"
             onClick={() => void copyAddress()}
             title={addr}
             aria-label="Copy wallet address"
@@ -79,19 +79,19 @@ export function WalletLayout({
             {copyFlash ? 'Copied!' : shortAddress(addr)}
           </button>
         ) : (
-          <span className="bfox-main-header__addr bfox-main-header__addr--empty muted">
+          <span className="l33t-main-header__addr l33t-main-header__addr--empty muted">
             Locked
           </span>
         )}
         <div className="screen-header-right">{settingsBtn}</div>
       </header>
 
-      <nav className="bfox-mm-tabs" aria-label="Wallet sections">
+      <nav className="l33t-mm-tabs" aria-label="Wallet sections">
         {(Object.keys(TAB_LABELS) as WalletMainTab[]).map(tab => (
           <button
             key={tab}
             type="button"
-            className={`bfox-mm-tabs__btn${activeTab === tab ? ' bfox-mm-tabs__btn--on' : ''}`}
+            className={`l33t-mm-tabs__btn${activeTab === tab ? ' l33t-mm-tabs__btn--on' : ''}`}
             aria-current={activeTab === tab ? 'page' : undefined}
             onClick={() => onTabChange(tab)}
           >
@@ -100,11 +100,11 @@ export function WalletLayout({
         ))}
       </nav>
 
-      <div className="bfox-layout-network">
+      <div className="l33t-layout-network">
         <NetworkSelector settings={settings} onSaved={onSaved} compact />
       </div>
 
-      <div className="screen-body bfox-body bfox-body--main">{children}</div>
+      <div className="screen-body l33t-body l33t-body--main">{children}</div>
 
       <DevErrorPanel />
       <DappConnectionBar settings={settings} onSaved={onSaved} />

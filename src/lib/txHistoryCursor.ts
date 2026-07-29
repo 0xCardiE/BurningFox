@@ -1,6 +1,6 @@
 import type { TxHistoryRow } from './explorerTxHistory';
 
-const STORAGE_KEY = 'burn_box_tx_history_v2';
+const STORAGE_KEY = 'l33t_tx_history_v2';
 
 type StoredRow = {
   hash: string;

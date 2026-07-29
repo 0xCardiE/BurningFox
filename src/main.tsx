@@ -9,12 +9,12 @@ bootstrapLiFi();
 
 /** Side panel (and other wide hosts): center content and allow more horizontal space. */
 const WIDE_SURFACE_MIN_INNER_WIDTH = 440;
-function syncBfoxSurfaceLayoutClass(): void {
+function syncL33tSurfaceLayoutClass(): void {
   const wide = window.innerWidth >= WIDE_SURFACE_MIN_INNER_WIDTH;
-  document.documentElement.classList.toggle('bfox-wide-surface', wide);
+  document.documentElement.classList.toggle('l33t-wide-surface', wide);
 }
-syncBfoxSurfaceLayoutClass();
-window.addEventListener('resize', syncBfoxSurfaceLayoutClass);
+syncL33tSurfaceLayoutClass();
+window.addEventListener('resize', syncL33tSurfaceLayoutClass);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

@@ -13,13 +13,13 @@ import { TxConfirmModeToggle } from './TxConfirmModeBar';
 function SiteIcon({ favIconUrl, label, connected }: { favIconUrl?: string; label: string; connected: boolean }) {
   const letter = label.trim().charAt(0).toUpperCase() || '?';
   return (
-    <span className="bfox-dapp-bar__icon-wrap">
+    <span className="l33t-dapp-bar__icon-wrap">
       {favIconUrl ? (
-        <img className="bfox-dapp-bar__icon" src={favIconUrl} alt="" draggable={false} />
+        <img className="l33t-dapp-bar__icon" src={favIconUrl} alt="" draggable={false} />
       ) : (
-        <span className="bfox-dapp-bar__icon bfox-dapp-bar__icon--fallback">{letter}</span>
+        <span className="l33t-dapp-bar__icon l33t-dapp-bar__icon--fallback">{letter}</span>
       )}
-      {connected ? <span className="bfox-dapp-bar__dot" aria-hidden /> : null}
+      {connected ? <span className="l33t-dapp-bar__dot" aria-hidden /> : null}
     </span>
   );
 }
@@ -86,14 +86,14 @@ export function DappConnectionBar({
   const canConnect = status?.canConnect === true;
 
   return (
-    <footer className="bfox-dapp-bar" aria-label="Website connection">
-      <div className="bfox-dapp-bar__site">
+    <footer className="l33t-dapp-bar" aria-label="Website connection">
+      <div className="l33t-dapp-bar__site">
         {connected && tab ? (
           <>
             <SiteIcon favIconUrl={tab.favIconUrl} label={tab.hostname} connected />
-            <span className="bfox-dapp-bar__meta">
-              <span className="bfox-dapp-bar__host">{tab.hostname}</span>
-              <span className="bfox-dapp-bar__sub">
+            <span className="l33t-dapp-bar__meta">
+              <span className="l33t-dapp-bar__host">{tab.hostname}</span>
+              <span className="l33t-dapp-bar__sub">
                 Connected
                 {chainName ? ` · ${chainName}` : ''}
               </span>
@@ -101,32 +101,32 @@ export function DappConnectionBar({
           </>
         ) : canConnect && tab ? (
           <>
-            <span className="bfox-dapp-bar__icon-wrap bfox-dapp-bar__icon-wrap--idle">
-              <span className="bfox-dapp-bar__icon bfox-dapp-bar__icon--fallback">
+            <span className="l33t-dapp-bar__icon-wrap l33t-dapp-bar__icon-wrap--idle">
+              <span className="l33t-dapp-bar__icon l33t-dapp-bar__icon--fallback">
                 {tab.hostname.charAt(0).toUpperCase()}
               </span>
             </span>
-            <span className="bfox-dapp-bar__meta">
-              <span className="bfox-dapp-bar__host">Not connected</span>
-              <span className="bfox-dapp-bar__sub">{tab.title || tab.hostname}</span>
+            <span className="l33t-dapp-bar__meta">
+              <span className="l33t-dapp-bar__host">Not connected</span>
+              <span className="l33t-dapp-bar__sub">{tab.title || tab.hostname}</span>
             </span>
           </>
         ) : (
-          <span className="bfox-dapp-bar__meta">
-            <span className="bfox-dapp-bar__host">Not connected</span>
-            <span className="bfox-dapp-bar__sub">
+          <span className="l33t-dapp-bar__meta">
+            <span className="l33t-dapp-bar__host">Not connected</span>
+            <span className="l33t-dapp-bar__sub">
               {status?.reason ?? 'Open a dapp in your browser tab'}
             </span>
           </span>
         )}
       </div>
 
-      <div className="bfox-dapp-bar__actions">
+      <div className="l33t-dapp-bar__actions">
         <TxConfirmModeToggle settings={settings} onSaved={onSaved} />
         {connected ? (
           <button
             type="button"
-            className="bfox-dapp-bar__btn bfox-dapp-bar__btn--disconnect"
+            className="l33t-dapp-bar__btn l33t-dapp-bar__btn--disconnect"
             disabled={busy}
             onClick={() => void onDisconnect()}
             aria-label="Disconnect from site"
@@ -141,7 +141,7 @@ export function DappConnectionBar({
         ) : canConnect && tab ? (
           <button
             type="button"
-            className="bfox-dapp-bar__btn bfox-dapp-bar__btn--connect"
+            className="l33t-dapp-bar__btn l33t-dapp-bar__btn--connect"
             disabled={busy || !isUnlocked()}
             onClick={() => void onConnect()}
           >
@@ -150,7 +150,7 @@ export function DappConnectionBar({
         ) : null}
       </div>
 
-      {err ? <p className="error bfox-dapp-bar__err">{err}</p> : null}
+      {err ? <p className="error l33t-dapp-bar__err">{err}</p> : null}
     </footer>
   );
 }

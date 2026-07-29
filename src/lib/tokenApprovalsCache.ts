@@ -1,6 +1,6 @@
 import type { TokenApprovalRow } from './tokenApprovals';
 
-const STORAGE_KEY = 'burn_box_token_approvals_v1';
+const STORAGE_KEY = 'l33t_token_approvals_v1';
 
 type StoredRow = {
   token: string;

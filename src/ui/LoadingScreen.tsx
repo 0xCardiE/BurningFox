@@ -1,15 +1,15 @@
-import { BurnBoxMark } from './BurnBoxLogo';
+import { L33tMark } from './L33tMark';
 
 export function LoadingScreen({ message }: { message?: string }) {
   return (
     <div
-      className="loading-screen jumpa-loading-screen"
+      className="loading-screen leet-loading-screen"
       role="status"
       aria-live="polite"
       aria-busy="true"
     >
-      <BurnBoxMark className="loading-screen-logo" size={72} />
-      <p className="loading-screen-brand">BurnBox</p>
+      <L33tMark className="loading-screen-logo" size={72} />
+      <p className="loading-screen-brand">1337</p>
       {message ? (
         <p className="loading-screen-message">{message}</p>
       ) : (

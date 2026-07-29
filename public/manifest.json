@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "BurnBox",
+  "name": "1337 Wallet",
   "version": "2.0.0",
-  "description": "Developer EVM burner wallet — swap via LI.FI, multi-send, RPC switcher, and MetaMask-compatible dapp connection.",
+  "description": "1337 — developer EVM burner wallet. Swap via LI.FI, multi-send, RPC switcher, and MetaMask-compatible dapp connection.",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -10,7 +10,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "BurnBox",
+    "default_title": "1337",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",

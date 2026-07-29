@@ -38,7 +38,7 @@ function buildContentScripts(): Plugin {
                   format: 'iife',
                   entryFileNames: `${name}.js`,
                   inlineDynamicImports: true,
-                  name: `BurnBox_${name}`,
+                  name: `L33t_${name}`,
                 },
               },
             },

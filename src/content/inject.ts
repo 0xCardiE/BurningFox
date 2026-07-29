@@ -13,7 +13,7 @@ import {
 } from '../provider/types';
 
 const CONTEXT_DEAD_MSG =
-  'BurnBox was updated or reloaded. Refresh this page to reconnect.';
+  '1337 was updated or reloaded. Refresh this page to reconnect.';
 
 let cachedReplaceMetaMask = true;
 let contextDead = false;

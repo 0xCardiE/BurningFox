@@ -126,7 +126,7 @@ export function NetworksView({
   const settingsBtn = (
     <button
       type="button"
-      className="bfox-icon-head"
+      className="l33t-icon-head"
       onClick={onOpenSettings}
       aria-label="Settings"
     >
@@ -135,9 +135,9 @@ export function NetworksView({
   );
 
   return (
-    <div className="wallet-shell bfox bfox--networks">
+    <div className="wallet-shell l33t l33t--networks">
       <ScreenHeader title="Networks" trailing={settingsBtn} />
-      <div className="screen-body bfox-body">
+      <div className="screen-body l33t-body">
         <p className="muted" style={{ marginTop: 0, fontSize: 12 }}>
           Developer network switcher with pre-filled public RPCs (chainlist-style). Pick a chain,
           choose an endpoint, refresh balances.

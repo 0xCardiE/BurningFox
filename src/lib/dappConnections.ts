@@ -1,4 +1,4 @@
-const CONNECTED_ORIGINS_KEY = 'burn_box_connected_origins';
+const CONNECTED_ORIGINS_KEY = 'l33t_connected_origins';
 const LEGACY_CONNECTED_ORIGINS_KEYS = ['burning_fox_connected_origins'] as const;
 
 export async function getConnectedOrigins(): Promise<Set<string>> {

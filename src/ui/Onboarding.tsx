@@ -75,8 +75,8 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
 
   if (showBackup && backupKey) {
     return (
-      <div className="wallet-shell bfox">
-        <ScreenHeader title="BurnBox" />
+      <div className="wallet-shell l33t">
+        <ScreenHeader title="1337" />
         <div className="screen-body">
           <h2 style={{ fontSize: '1.1rem', marginBottom: 8 }}>Back up your key</h2>
           <p className="muted">
@@ -103,8 +103,8 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
   }
 
   return (
-    <div className="wallet-shell bfox">
-      <ScreenHeader title="BurnBox" />
+    <div className="wallet-shell l33t">
+      <ScreenHeader title="1337" />
       <div className="screen-body">
         <p className="muted" style={{ marginTop: 0 }}>
           A developer burner wallet for testing. Create or import a private key — not meant for

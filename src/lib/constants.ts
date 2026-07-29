@@ -1,21 +1,18 @@
 /** Slippage shown as percent in settings (e.g. 5 = 5%). */
 export const DEFAULT_SLIPPAGE_PERCENT = 5;
 
-export const LIFI_INTEGRATOR_ID = 'burnbox-extension';
+export const LIFI_INTEGRATOR_ID = '1337-wallet';
 
-/** Compact mark for EIP-6963 / wallet discovery (keep small). */
-const BURNBOX_ICON_SVG =
-  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128' fill='none'><circle cx='64' cy='70' r='56' fill='%23FF8A3D' fill-opacity='.35'/><path d='M40 52c-2-16 5-28 12-34 1 9 4 15 8 19-8 2-14 8-20 15Z' fill='%23FF9A1A'/><path d='M64 4c-3 11-2 22 1 30 4-10 10-16 16-19-4 11-4 22-2 30C70 32 64 18 64 4Z' fill='%23FFB800'/><path d='M88 52c2-16-5-28-12-34-1 9-4 15-8 19 8 2 14 8 20 15Z' fill='%23FF9A1A'/><path d='M30 56h68v48c0 6-5 10-11 10H41c-6 0-11-4-11-10V56Z' fill='%23FF7A1A'/><path d='M28 56c2-10 10-16 18-18l42-6c8-1 16 4 18 14L98 56H30Z' fill='%23FFB14A'/><ellipse cx='64' cy='78' rx='22' ry='14' fill='%23FFF3E0' fill-opacity='.85'/><rect x='46' y='86' width='36' height='8' rx='3' fill='%23FFF3E0' fill-opacity='.35'/></svg>";
+/** Compact mark for EIP-6963 / wallet discovery (keep small) — pixel "13/37" glyph. */
+const L33T_ICON_SVG =
+  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'><rect width='128' height='128' rx='24' fill='%23050806'/><path fill='%2322c55e' d='M39 9h10v10h-10zM69 9h10v10h-10zM79 9h10v10h-10zM89 9h10v10h-10zM29 19h10v10h-10zM39 19h10v10h-10zM89 19h10v10h-10zM39 29h10v10h-10zM69 29h10v10h-10zM79 29h10v10h-10zM89 29h10v10h-10zM39 39h10v10h-10zM89 39h10v10h-10zM29 49h10v10h-10zM39 49h10v10h-10zM49 49h10v10h-10zM69 49h10v10h-10zM79 49h10v10h-10zM89 49h10v10h-10zM29 69h10v10h-10zM39 69h10v10h-10zM49 69h10v10h-10zM69 69h10v10h-10zM79 69h10v10h-10zM89 69h10v10h-10zM49 79h10v10h-10zM89 79h10v10h-10zM29 89h10v10h-10zM39 89h10v10h-10zM49 89h10v10h-10zM89 89h10v10h-10zM49 99h10v10h-10zM89 99h10v10h-10zM29 109h10v10h-10zM39 109h10v10h-10zM49 109h10v10h-10zM89 109h10v10h-10z'/></svg>";
 
-export const BURNBOX_PROVIDER_INFO = {
-  uuid: 'burnbox-dev-wallet-2026',
-  name: 'BurnBox',
-  icon: `data:image/svg+xml,${BURNBOX_ICON_SVG}`,
-  rdns: 'io.burnbox.wallet',
+export const L33T_PROVIDER_INFO = {
+  uuid: 'l33t-dev-wallet-2026',
+  name: '1337',
+  icon: `data:image/svg+xml,${L33T_ICON_SVG}`,
+  rdns: 'io.l33t.wallet',
 } as const;
-
-/** @deprecated Use BURNBOX_PROVIDER_INFO */
-export const BURNING_FOX_PROVIDER_INFO = BURNBOX_PROVIDER_INFO;
 
 /** Default chain when no network is selected yet. */
 export const DEFAULT_CHAIN_ID = 1;

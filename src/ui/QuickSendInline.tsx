@@ -120,12 +120,12 @@ export function QuickSendInline({
 
   if (txHash) {
     return (
-      <div className="bfox-quick-send-inline bfox-quick-send-inline--done">
-        <div className="bfox-quick-send-inline__done-main">
-          <span className="bfox-quick-send-inline__ok">Sent</span>
+      <div className="l33t-quick-send-inline l33t-quick-send-inline--done">
+        <div className="l33t-quick-send-inline__done-main">
+          <span className="l33t-quick-send-inline__ok">Sent</span>
           {explorerUrl ? (
             <a
-              className="bfox-quick-send-inline__tx-link"
+              className="l33t-quick-send-inline__tx-link"
               href={explorerUrl}
               target="_blank"
               rel="noopener noreferrer"
@@ -136,14 +136,14 @@ export function QuickSendInline({
             <span className="mono muted">{txHash.slice(0, 10)}…</span>
           )}
         </div>
-        <div className="bfox-quick-send-inline__done-meta">
-          <span className="bfox-quick-send-inline__hint">
+        <div className="l33t-quick-send-inline__done-meta">
+          <span className="l33t-quick-send-inline__hint">
             {formatTokenAmount(sentAmount, token.decimals)} {token.symbol}
           </span>
           {sentTo ? (
-            <span className="bfox-quick-send-inline__to muted">to {shortAddress(sentTo)}</span>
+            <span className="l33t-quick-send-inline__to muted">to {shortAddress(sentTo)}</span>
           ) : null}
-          <span className="bfox-quick-send-inline__timer muted">{secondsLeft}s</span>
+          <span className="l33t-quick-send-inline__timer muted">{secondsLeft}s</span>
         </div>
       </div>
     );
@@ -153,9 +153,9 @@ export function QuickSendInline({
     addrFocused || !toValid ? toRaw : shortAddress(getAddress(toRaw.trim()));
 
   return (
-    <div className="bfox-quick-send-inline">
+    <div className="l33t-quick-send-inline">
       <input
-        className="bfox-quick-send-inline__addr"
+        className="l33t-quick-send-inline__addr"
         value={addrDisplay}
         onChange={e => setToRaw(e.target.value)}
         onFocus={() => setAddrFocused(true)}
@@ -168,7 +168,7 @@ export function QuickSendInline({
         title={toValid ? getAddress(toRaw.trim()) : undefined}
       />
       <input
-        className="bfox-quick-send-inline__amt"
+        className="l33t-quick-send-inline__amt"
         value={amountStr}
         onChange={e => setAmountStr(e.target.value)}
         placeholder="0.0"
@@ -178,7 +178,7 @@ export function QuickSendInline({
       />
       <button
         type="button"
-        className="bfox-quick-send-inline__max"
+        className="l33t-quick-send-inline__max"
         onClick={useMax}
         disabled={busy}
         title="Use max balance"
@@ -187,13 +187,13 @@ export function QuickSendInline({
       </button>
       <button
         type="button"
-        className="bfox-quick-send-inline__send primary"
+        className="l33t-quick-send-inline__send primary"
         disabled={!canSend}
         onClick={() => void submit()}
       >
         {busy ? '…' : 'Send'}
       </button>
-      {fieldErr ? <p className="error bfox-quick-send-inline__err">{fieldErr}</p> : null}
+      {fieldErr ? <p className="error l33t-quick-send-inline__err">{fieldErr}</p> : null}
     </div>
   );
 }

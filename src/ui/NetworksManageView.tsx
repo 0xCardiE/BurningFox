@@ -16,7 +16,7 @@ import { chainLogoUri } from '../lib/chainLogo';
 import { notifyConnectedTabsChainChanged } from '../lib/chainSyncBridge';
 import { allRpcOptionsFor } from '../lib/chainRpcRegistry';
 import { describeError } from '../lib/utils';
-import { JumpaLiFiIcon } from './JumpaLiFiIcon';
+import { LeetLiFiIcon } from './LeetLiFiIcon';
 import { ScreenHeader } from './ScreenHeader';
 
 type Panel = 'list' | 'detail' | 'add';
@@ -314,17 +314,17 @@ export function NetworksManageView({
         : 'Networks';
 
   return (
-    <div className="wallet-shell bfox bfox--networks-manage">
+    <div className="wallet-shell l33t l33t--networks-manage">
       <ScreenHeader title={title} onClose={headerBack} />
-      <div className="screen-body bfox-body bfox-networks">
+      <div className="screen-body l33t-body l33t-networks">
         {panel === 'list' ? (
           <>
-            <p className="muted bfox-networks__lead">
+            <p className="muted l33t-networks__lead">
               Manage chains and RPC endpoints. Active network stays on the Assets tab.
             </p>
 
-            <div className="bfox-networks__toolbar">
-              <div className="bfox-networks__filters" role="group" aria-label="Filter chains">
+            <div className="l33t-networks__toolbar">
+              <div className="l33t-networks__filters" role="group" aria-label="Filter chains">
                 {(
                   [
                     ['mainnet', 'Mainnets'],
@@ -336,8 +336,8 @@ export function NetworksManageView({
                     type="button"
                     className={
                       filter === value
-                        ? 'bfox-networks__chip bfox-networks__chip--on'
-                        : 'bfox-networks__chip'
+                        ? 'l33t-networks__chip l33t-networks__chip--on'
+                        : 'l33t-networks__chip'
                     }
                     onClick={() => setFilter(value)}
                   >
@@ -345,12 +345,12 @@ export function NetworksManageView({
                   </button>
                 ))}
               </div>
-              <button type="button" className="ghost bfox-networks__add-btn" onClick={openAdd}>
+              <button type="button" className="ghost l33t-networks__add-btn" onClick={openAdd}>
                 Add chain
               </button>
             </div>
 
-            <ul className="bfox-networks__list">
+            <ul className="l33t-networks__list">
               {chains.map(c => {
                 const active = c.chainId === activeChainId;
                 const custom = !isCuratedChain(c.chainId);
@@ -360,35 +360,35 @@ export function NetworksManageView({
                       type="button"
                       className={
                         active
-                          ? 'bfox-networks__row bfox-networks__row--active'
-                          : 'bfox-networks__row'
+                          ? 'l33t-networks__row l33t-networks__row--active'
+                          : 'l33t-networks__row'
                       }
                       onClick={() => openDetail(c.chainId)}
                     >
-                      <JumpaLiFiIcon
+                      <LeetLiFiIcon
                         logoURI={chainLogoUri(c)}
                         label={c.name}
                         size={28}
                         rounded
                       />
-                      <span className="bfox-networks__row-text">
-                        <span className="bfox-networks__row-name">
+                      <span className="l33t-networks__row-text">
+                        <span className="l33t-networks__row-name">
                           {c.name}
                           {custom ? (
-                            <span className="bfox-networks__badge">Custom</span>
+                            <span className="l33t-networks__badge">Custom</span>
                           ) : null}
                           {active ? (
-                            <span className="bfox-networks__badge bfox-networks__badge--on">
+                            <span className="l33t-networks__badge l33t-networks__badge--on">
                               Active
                             </span>
                           ) : null}
                         </span>
-                        <span className="bfox-networks__row-sub muted">
+                        <span className="l33t-networks__row-sub muted">
                           Chain ID {c.chainId}
                           {c.kind === 'testnet' ? ' · Testnet' : ''}
                         </span>
                       </span>
-                      <span className="bfox-networks__chev" aria-hidden>
+                      <span className="l33t-networks__chev" aria-hidden>
                         ›
                       </span>
                     </button>
@@ -401,15 +401,15 @@ export function NetworksManageView({
 
         {panel === 'detail' && selected ? (
           <>
-            <div className="bfox-networks__detail-head">
-              <JumpaLiFiIcon
+            <div className="l33t-networks__detail-head">
+              <LeetLiFiIcon
                 logoURI={chainLogoUri(selected)}
                 label={selected.name}
                 size={36}
                 rounded
               />
               <div>
-                <p className="bfox-networks__detail-name">{selected.name}</p>
+                <p className="l33t-networks__detail-name">{selected.name}</p>
                 <p className="muted" style={{ margin: 0, fontSize: 12 }}>
                   ID {selected.chainId} · {selected.nativeCurrency.symbol}
                   {!isCuratedChain(selected.chainId) ? ' · Custom' : ''}
@@ -428,36 +428,36 @@ export function NetworksManageView({
                 Use this network
               </button>
             ) : (
-              <p className="muted bfox-networks__active-note">Currently active in wallet &amp; dapps</p>
+              <p className="muted l33t-networks__active-note">Currently active in wallet &amp; dapps</p>
             )}
 
-            <h3 className="bfox-networks__section-title">RPC endpoints</h3>
-            <ul className="bfox-networks__rpc-list">
+            <h3 className="l33t-networks__section-title">RPC endpoints</h3>
+            <ul className="l33t-networks__rpc-list">
               {rpcOptions.map(url => {
                 const isPreferred = preferredRpc ? preferredRpc === url : url === rpcOptions[0];
                 const isUser = userRpcs.includes(url);
                 return (
-                  <li key={url} className="bfox-networks__rpc-row">
+                  <li key={url} className="l33t-networks__rpc-row">
                     <button
                       type="button"
                       className={
                         isPreferred
-                          ? 'bfox-networks__rpc-pick bfox-networks__rpc-pick--on'
-                          : 'bfox-networks__rpc-pick'
+                          ? 'l33t-networks__rpc-pick l33t-networks__rpc-pick--on'
+                          : 'l33t-networks__rpc-pick'
                       }
                       disabled={busy}
                       onClick={() => void setPreferred(selected.chainId, url)}
                       title={url}
                     >
-                      <span className="bfox-networks__rpc-label">{shortRpcLabel(url)}</span>
+                      <span className="l33t-networks__rpc-label">{shortRpcLabel(url)}</span>
                       {isPreferred ? (
-                        <span className="bfox-networks__badge bfox-networks__badge--on">Preferred</span>
+                        <span className="l33t-networks__badge l33t-networks__badge--on">Preferred</span>
                       ) : null}
                     </button>
                     {isUser ? (
                       <button
                         type="button"
-                        className="ghost bfox-networks__rpc-remove"
+                        className="ghost l33t-networks__rpc-remove"
                         disabled={busy}
                         aria-label="Remove RPC"
                         onClick={() => void removeUserRpc(selected.chainId, url)}
@@ -470,7 +470,7 @@ export function NetworksManageView({
               })}
             </ul>
 
-            <label htmlFor="net-add-rpc" className="bfox-networks__section-title" style={{ display: 'block' }}>
+            <label htmlFor="net-add-rpc" className="l33t-networks__section-title" style={{ display: 'block' }}>
               Add RPC
             </label>
             <div className="row" style={{ marginBottom: 8 }}>
@@ -507,7 +507,7 @@ export function NetworksManageView({
 
         {panel === 'add' ? (
           <>
-            <p className="muted bfox-networks__lead">
+            <p className="muted l33t-networks__lead">
               Add a custom EVM network. It appears in the chain picker alongside curated networks.
             </p>
 

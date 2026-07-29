@@ -7,9 +7,9 @@ import {
   type ProviderResponse,
   type WindowProviderEvent,
 } from '../provider/types';
-import { BURNBOX_PROVIDER_INFO } from '../lib/constants';
+import { L33T_PROVIDER_INFO } from '../lib/constants';
 
-const BURNBOX_FLAG = '__burnBoxInjected';
+const L33T_FLAG = '__l33tInjected';
 
 type Listener = (...args: unknown[]) => void;
 
@@ -24,10 +24,8 @@ class ProviderRpcError extends Error {
   }
 }
 
-class BurnBoxProvider {
-  readonly isBurnBox = true;
-  /** @deprecated Use isBurnBox */
-  readonly isBurningFox = true;
+class L33tProvider {
+  readonly is1337 = true;
   readonly isMetaMask = true;
   readonly _metamask = {
     isUnlocked: async () => true,
@@ -144,7 +142,7 @@ class BurnBoxProvider {
     const id =
       typeof crypto !== 'undefined' && 'randomUUID' in crypto
         ? crypto.randomUUID()
-        : `bbox-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        : `l33t-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const req: ProviderRequest = { id, method: args.method, params: args.params };
     const result = await new Promise<unknown>((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
@@ -155,7 +153,7 @@ class BurnBoxProvider {
       window.setTimeout(() => {
         if (this.pending.has(id)) {
           this.pending.delete(id);
-          reject(new ProviderRpcError(4900, 'BurnBox provider request timed out'));
+          reject(new ProviderRpcError(4900, '1337 provider request timed out'));
         }
       }, 120_000);
     });
@@ -253,7 +251,7 @@ class BurnBoxProvider {
   }
 }
 
-function announceEip6963(provider: BurnBoxProvider, replaceMetaMask: boolean): void {
+function announceEip6963(provider: L33tProvider, replaceMetaMask: boolean): void {
   const announceDetail = (info: {
     uuid: string;
     name: string;
@@ -269,17 +267,17 @@ function announceEip6963(provider: BurnBoxProvider, replaceMetaMask: boolean): v
 
   const announce = () => {
     announceDetail({
-      uuid: BURNBOX_PROVIDER_INFO.uuid,
-      name: BURNBOX_PROVIDER_INFO.name,
-      icon: BURNBOX_PROVIDER_INFO.icon,
-      rdns: BURNBOX_PROVIDER_INFO.rdns,
+      uuid: L33T_PROVIDER_INFO.uuid,
+      name: L33T_PROVIDER_INFO.name,
+      icon: L33T_PROVIDER_INFO.icon,
+      rdns: L33T_PROVIDER_INFO.rdns,
     });
     /* Wallet modals often filter for MetaMask by rdns — surface ourselves there in drop-in mode. */
     if (replaceMetaMask) {
       announceDetail({
-        uuid: 'burnbox-metamask-dropin-2026',
+        uuid: 'l33t-metamask-dropin-2026',
         name: 'MetaMask',
-        icon: BURNBOX_PROVIDER_INFO.icon,
+        icon: L33T_PROVIDER_INFO.icon,
         rdns: 'io.metamask',
       });
     }
@@ -293,8 +291,8 @@ function announceEip6963(provider: BurnBoxProvider, replaceMetaMask: boolean): v
 }
 
 function installEthereumShim(
-  w: Window & { ethereum?: BurnBoxProvider & { providers?: unknown[] } },
-  provider: BurnBoxProvider,
+  w: Window & { ethereum?: L33tProvider & { providers?: unknown[] } },
+  provider: L33tProvider,
 ): void {
   const legacy = w.ethereum;
   const legacyList: unknown[] =
@@ -313,7 +311,7 @@ function installEthereumShim(
           return provider;
         },
         set(next) {
-          if (next && (next as BurnBoxProvider).isBurnBox) return;
+          if (next && (next as L33tProvider).is1337) return;
           if (next && !legacyList.includes(next)) legacyList.push(next);
         },
       });
@@ -338,25 +336,22 @@ function installEthereumShim(
   window.dispatchEvent(new Event('ethereum#initialized'));
 }
 
-function installProvider(replaceMetaMask: boolean): BurnBoxProvider {
+function installProvider(replaceMetaMask: boolean): L33tProvider {
   const w = window as Window & {
-    ethereum?: BurnBoxProvider & { providers?: unknown[] };
-    burnBox?: BurnBoxProvider;
-    burningFox?: BurnBoxProvider;
-    [BURNBOX_FLAG]?: boolean;
+    ethereum?: L33tProvider & { providers?: unknown[] };
+    l33t?: L33tProvider;
+    [L33T_FLAG]?: boolean;
   };
 
-  if (w[BURNBOX_FLAG] && w.burnBox) {
-    announceEip6963(w.burnBox, replaceMetaMask);
-    if (replaceMetaMask) installEthereumShim(w, w.burnBox);
-    return w.burnBox;
+  if (w[L33T_FLAG] && w.l33t) {
+    announceEip6963(w.l33t, replaceMetaMask);
+    if (replaceMetaMask) installEthereumShim(w, w.l33t);
+    return w.l33t;
   }
 
-  w[BURNBOX_FLAG] = true;
-  const provider = new BurnBoxProvider();
-  w.burnBox = provider;
-  /* Compat alias for older pages/scripts. */
-  w.burningFox = provider;
+  w[L33T_FLAG] = true;
+  const provider = new L33tProvider();
+  w.l33t = provider;
 
   if (replaceMetaMask) {
     installEthereumShim(w, provider);

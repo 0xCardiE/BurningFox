@@ -22,8 +22,8 @@ import { appendSwapToHistory, loadSwapHistory, type SwapHistoryEntry } from '../
 import { loadSwapUi, saveSwapUi } from '../lib/swapUiPersist';
 import { describeRevertedTx } from '../lib/txFailureDetail';
 import { ScreenHeader } from './ScreenHeader';
-import { JumpaLiFiIcon } from './JumpaLiFiIcon';
-import { JumpaTokenWithBadge } from './JumpaTokenWithBadge';
+import { LeetLiFiIcon } from './LeetLiFiIcon';
+import { LeetTokenWithBadge } from './LeetTokenWithBadge';
 import { DefiYieldPanel } from './DefiYieldPanel';
 
 type WalletTab = 'swap' | 'defi' | 'history';
@@ -295,10 +295,10 @@ function SwapExecLog({
   if (url && tx && log.includes(tx.hash)) {
     const i = log.indexOf(tx.hash);
     return (
-      <div className="jumpa-exec-log">
-        <p className="jumpa-exec-log__text">
+      <div className="leet-exec-log">
+        <p className="leet-exec-log__text">
           {log.slice(0, i)}
-          <a href={url} target="_blank" rel="noopener noreferrer" className="jumpa-tx-link mono">
+          <a href={url} target="_blank" rel="noopener noreferrer" className="leet-tx-link mono">
             {tx.hash}
           </a>
           {log.slice(i + tx.hash.length)}
@@ -308,11 +308,11 @@ function SwapExecLog({
   }
 
   return (
-    <div className="jumpa-exec-log">
-      <p className="jumpa-exec-log__text">{log}</p>
+    <div className="leet-exec-log">
+      <p className="leet-exec-log__text">{log}</p>
       {url && tx ? (
-        <p className="jumpa-exec-log__sub">
-          <a href={url} target="_blank" rel="noopener noreferrer" className="jumpa-tx-link">
+        <p className="leet-exec-log__sub">
+          <a href={url} target="_blank" rel="noopener noreferrer" className="leet-tx-link">
             Open in {explorerHint} ↗
           </a>
         </p>
@@ -1262,7 +1262,7 @@ export function SwapView({
   const settingsBtn = (
     <button
       type="button"
-      className="jumpa-icon-head"
+      className="leet-icon-head"
       onClick={onOpenSettings}
       aria-label="Settings"
     >
@@ -1284,9 +1284,9 @@ export function SwapView({
   );
 
   const sheetSearch = (placeholder: string, value: string, set: (s: string) => void) => (
-    <div className="jumpa-search-field">
+    <div className="leet-search-field">
       <svg
-        className="jumpa-search-field__icon"
+        className="leet-search-field__icon"
         width="18"
         height="18"
         viewBox="0 0 24 24"
@@ -1301,7 +1301,7 @@ export function SwapView({
       </svg>
       <input
         type="search"
-        className="jumpa-search-field__input"
+        className="leet-search-field__input"
         placeholder={placeholder}
         value={value}
         onChange={e => set(e.target.value)}
@@ -1318,23 +1318,23 @@ export function SwapView({
   }, [embedded]);
 
   const body = (
-    <div className={embedded ? 'jumpa-body jumpa-body--compact' : 'screen-body jumpa-body jumpa-body--compact'}>
+    <div className={embedded ? 'leet-body leet-body--compact' : 'screen-body leet-body leet-body--compact'}>
         {(embedded || walletTab === 'swap') ? (
           <>
-            <p className="jumpa-li-fi-hint">Powered by Li.Fi</p>
+            <p className="leet-li-fi-hint">Powered by Li.Fi</p>
 
-            <div className="jumpa-card jumpa-exchange-card">
-              <div className="jumpa-pair-row">
+            <div className="leet-card leet-exchange-card">
+              <div className="leet-pair-row">
                 <button
                   type="button"
-                  className="jumpa-pair-cell"
+                  className="leet-pair-cell"
                   onClick={() => {
                     setFromTokenSearch('');
                     setSheet('fromToken');
                   }}
                   disabled={balancesBusy}
                 >
-                  <JumpaTokenWithBadge
+                  <LeetTokenWithBadge
                     tokenLogoURI={fromToken?.logoURI}
                     chainLogoURI={fromChainMeta?.logoURI}
                     size={40}
@@ -1346,12 +1346,12 @@ export function SwapView({
 
                 <button
                   type="button"
-                  className="jumpa-pair-flip"
+                  className="leet-pair-flip"
                   aria-label="Swap from and to tokens"
                   onClick={() => flipExchangePair()}
                   disabled={balancesBusy || fromChainId == null || toChainId == null}
                 >
-                  <span className="jumpa-pair-mid-circle">
+                  <span className="leet-pair-mid-circle">
                     <svg
                       width="18"
                       height="18"
@@ -1371,14 +1371,14 @@ export function SwapView({
 
                 <button
                   type="button"
-                  className="jumpa-pair-cell"
+                  className="leet-pair-cell"
                   onClick={() => {
                     setToSearch('');
                     setSheet('toToken');
                   }}
                   disabled={destBusy}
                 >
-                  <JumpaTokenWithBadge
+                  <LeetTokenWithBadge
                     tokenLogoURI={toToken?.logoURI}
                     chainLogoURI={toChainMeta?.logoURI}
                     size={40}
@@ -1389,10 +1389,10 @@ export function SwapView({
                 </button>
               </div>
 
-              <div className="jumpa-send-block">
-                <span className="jumpa-label">From</span>
+              <div className="leet-send-block">
+                <span className="leet-label">From</span>
                 <input
-                  className="jumpa-amount-massive"
+                  className="leet-amount-massive"
                   value={amountStr}
                   disabled={execBusy}
                   onChange={e => {
@@ -1403,17 +1403,17 @@ export function SwapView({
                   placeholder="0"
                   inputMode="decimal"
                 />
-                <div className="jumpa-amount-meta">
-                  <span className="jumpa-amount-usd">
+                <div className="leet-amount-meta">
+                  <span className="leet-amount-usd">
                     {amountUsdPreview != null ? `~$${amountUsdPreview}` : '—'}
                   </span>
                 </div>
-                <div className="jumpa-pct-row">
+                <div className="leet-pct-row">
                   {([25, 50, 75] as const).map(pct => (
                     <button
                       key={pct}
                       type="button"
-                      className="jumpa-pct"
+                      className="leet-pct"
                       disabled={!fromToken || balancesBusy || execBusy}
                       onClick={() => applyAmountPercent(pct)}
                     >
@@ -1422,7 +1422,7 @@ export function SwapView({
                   ))}
                   <button
                     type="button"
-                    className="jumpa-pct jumpa-pct--max"
+                    className="leet-pct leet-pct--max"
                     disabled={!fromToken || balancesBusy || execBusy}
                     onClick={maxAmount}
                   >
@@ -1431,11 +1431,11 @@ export function SwapView({
                 </div>
               </div>
 
-              <div className="jumpa-actions">
+              <div className="leet-actions">
                 {swapSuccessCta && !quote && !quoteBusy ? (
                   <button
                     type="button"
-                    className="primary jumpa-success-cta"
+                    className="primary leet-success-cta"
                     tabIndex={-1}
                     aria-disabled="true"
                     aria-live="polite"
@@ -1458,10 +1458,10 @@ export function SwapView({
               {balancesErr && <p className="error">Balances: {balancesErr}</p>}
               {quoteErr && <p className="error">{quoteErr}</p>}
               {quote && (
-                <div className="jumpa-quote jumpa-quote--compact">
-                  <div className="jumpa-quote-assets">
-                    <div className="jumpa-quote-chip">
-                      <JumpaLiFiIcon
+                <div className="leet-quote leet-quote--compact">
+                  <div className="leet-quote-assets">
+                    <div className="leet-quote-chip">
+                      <LeetLiFiIcon
                         logoURI={quote.action.fromToken.logoURI}
                         label={quote.action.fromToken.symbol}
                         size={28}
@@ -1471,11 +1471,11 @@ export function SwapView({
                         <strong>{quote.action.fromToken.symbol}</strong>
                       </span>
                     </div>
-                    <span className="jumpa-quote-arrow" aria-hidden>
+                    <span className="leet-quote-arrow" aria-hidden>
                       →
                     </span>
-                    <div className="jumpa-quote-chip">
-                      <JumpaLiFiIcon
+                    <div className="leet-quote-chip">
+                      <LeetLiFiIcon
                         logoURI={quote.action.toToken.logoURI}
                         label={quote.action.toToken.symbol}
                         size={28}
@@ -1486,12 +1486,12 @@ export function SwapView({
                       </span>
                     </div>
                   </div>
-                  <div className="muted jumpa-quote-route">
+                  <div className="muted leet-quote-route">
                     Via <strong>{quote.tool}</strong>
                     {quote.toolDetails?.name ? ` · ${quote.toolDetails.name}` : ''}
                   </div>
                   {outPreview && quote.action.toToken && (
-                    <p className="jumpa-est">
+                    <p className="leet-est">
                       Est.{' '}
                       <strong>
                         {fmtNum(Number(outPreview))} {quote.action.toToken.symbol}
@@ -1500,7 +1500,7 @@ export function SwapView({
                   )}
                   <button
                     type="button"
-                    className="primary jumpa-swap-btn"
+                    className="primary leet-swap-btn"
                     disabled={execBusy || !quote.transactionRequest || !!quoteErr}
                     onClick={() => void execute()}
                   >
@@ -1515,7 +1515,7 @@ export function SwapView({
               )}
             </div>
 
-            <div className="jumpa-footer jumpa-footer--tight">
+            <div className="leet-footer leet-footer--tight">
               <button
                 type="button"
                 className="ghost"
@@ -1532,11 +1532,11 @@ export function SwapView({
         ) : walletTab === 'defi' ? (
           <DefiYieldPanel />
         ) : (
-          <div className="jumpa-history-tab">
+          <div className="leet-history-tab">
             {swapHistory.length === 0 ? (
-              <p className="jumpa-history-tab__empty muted">No activity recorded yet.</p>
+              <p className="leet-history-tab__empty muted">No activity recorded yet.</p>
             ) : (
-              <ul className="jumpa-history-tab__list jumpa-swap-history__list">
+              <ul className="leet-history-tab__list leet-swap-history__list">
                 {swapHistory.map(e => {
                   const url = transactionExplorerUrl(
                     e.txChainId,
@@ -1550,17 +1550,17 @@ export function SwapView({
                     (url ? ' · View tx' : '');
                   const inner = (
                     <>
-                      <span className="jumpa-swap-history__pair">
+                      <span className="leet-swap-history__pair">
                         {e.fromSymbol} → {e.toSymbol}
                       </span>
-                      <span className="jumpa-swap-history__sub muted">{sub}</span>
+                      <span className="leet-swap-history__sub muted">{sub}</span>
                     </>
                   );
                   return (
                     <li key={e.id}>
                       {url ? (
                         <a
-                          className="jumpa-swap-history__row"
+                          className="leet-swap-history__row"
                           href={url}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -1568,7 +1568,7 @@ export function SwapView({
                           {inner}
                         </a>
                       ) : (
-                        <span className="jumpa-swap-history__row jumpa-swap-history__row--dead">
+                        <span className="leet-swap-history__row leet-swap-history__row--dead">
                           {inner}
                         </span>
                       )}
@@ -1581,7 +1581,7 @@ export function SwapView({
         )}
 
         {!embedded ? (
-          <p className="muted mono jumpa-address" title={addr}>
+          <p className="muted mono leet-address" title={addr}>
             {addr}
           </p>
         ) : null}
@@ -1589,40 +1589,40 @@ export function SwapView({
   );
 
   const sheets = walletTab === 'swap' && sheet ? (
-        <div className="jumpa-sheet-mount">
+        <div className="leet-sheet-mount">
           <button
             type="button"
-            className="jumpa-sheet-backdrop"
+            className="leet-sheet-backdrop"
             aria-label="Dismiss"
             onClick={closeSheet}
           />
           <div
-            className="jumpa-sheet-panel"
+            className="leet-sheet-panel"
             role="dialog"
             aria-modal="true"
             onClick={e => e.stopPropagation()}
           >
             {sheet === 'fromNet' && (
               <>
-                <div className="jumpa-sheet-head">
+                <div className="leet-sheet-head">
                   <button
                     type="button"
-                    className="jumpa-sheet-back"
+                    className="leet-sheet-back"
                     onClick={() => setSheet('fromToken')}
                     aria-label="Back"
                   >
                     ‹
                   </button>
-                  <h2 className="jumpa-sheet-h2">From network</h2>
+                  <h2 className="leet-sheet-h2">From network</h2>
                 </div>
                 {sheetSearch('Search network', fromNetSearch, setFromNetSearch)}
-                <ul className="jumpa-sheet-list">
+                <ul className="leet-sheet-list">
                   {filteredFromChainsSheet.map(c => (
                     <li key={c.id}>
                       <button
                         type="button"
                         className={
-                          'jumpa-sheet-row' + (c.id === fromChainId ? ' jumpa-sheet-row--on' : '')
+                          'leet-sheet-row' + (c.id === fromChainId ? ' leet-sheet-row--on' : '')
                         }
                         onClick={() => {
                           setSwapSuccessCta(false);
@@ -1634,8 +1634,8 @@ export function SwapView({
                           setSheet('fromToken');
                         }}
                       >
-                        <JumpaLiFiIcon logoURI={c.logo} label={c.name} size={34} rounded />
-                        <span className="jumpa-sheet-row-text">{c.name}</span>
+                        <LeetLiFiIcon logoURI={c.logo} label={c.name} size={34} rounded />
+                        <span className="leet-sheet-row-text">{c.name}</span>
                       </button>
                     </li>
                   ))}
@@ -1645,47 +1645,47 @@ export function SwapView({
 
             {sheet === 'fromToken' && (
               <>
-                <div className="jumpa-sheet-head">
+                <div className="leet-sheet-head">
                   <button
                     type="button"
-                    className="jumpa-sheet-back"
+                    className="leet-sheet-back"
                     onClick={closeSheet}
                     aria-label="Back"
                   >
                     ‹
                   </button>
-                  <h2 className="jumpa-sheet-h2">Exchange from</h2>
+                  <h2 className="leet-sheet-h2">Exchange from</h2>
                 </div>
                 <button
                   type="button"
-                  className="jumpa-sheet-net-pill jumpa-sheet-net-pill--brand"
+                  className="leet-sheet-net-pill leet-sheet-net-pill--brand"
                   onClick={() => setSheet('fromNet')}
                   disabled={!chainChoices.length}
                 >
-                  <JumpaLiFiIcon
+                  <LeetLiFiIcon
                     logoURI={fromChainMeta?.logoURI}
                     label={fromChainId != null ? chainName(fromChainId) : ' '}
                     size={28}
                     rounded
                   />
-                  <span className="jumpa-sheet-net-pill-stack">
-                    <span className="jumpa-sheet-net-pill-muted">Network</span>
-                    <span className="jumpa-sheet-net-pill-name">
+                  <span className="leet-sheet-net-pill-stack">
+                    <span className="leet-sheet-net-pill-muted">Network</span>
+                    <span className="leet-sheet-net-pill-name">
                       {fromChainId != null ? chainName(fromChainId) : '…'}
                     </span>
                   </span>
-                  <span className="jumpa-sheet-net-pill-chev" aria-hidden>
+                  <span className="leet-sheet-net-pill-chev" aria-hidden>
                     ›
                   </span>
                 </button>
                 {sheetSearch('Search by token or address', fromTokenSearch, setFromTokenSearch)}
-                <ul className="jumpa-sheet-list">
+                <ul className="leet-sheet-list">
                   {sourceTokensBusy ? (
-                    <li className="jumpa-sheet-empty">Loading tokens…</li>
+                    <li className="leet-sheet-empty">Loading tokens…</li>
                   ) : sourceTokensErr && !fromChoices.length ? (
-                    <li className="jumpa-sheet-empty">{sourceTokensErr}</li>
+                    <li className="leet-sheet-empty">{sourceTokensErr}</li>
                   ) : !filteredFromTokensSheet.length ? (
-                    <li className="jumpa-sheet-empty">
+                    <li className="leet-sheet-empty">
                       {fromTokenSearch.trim()
                         ? 'No tokens match search.'
                         : 'No token list for this network yet. Pull to refresh balances or try search.'}
@@ -1696,9 +1696,9 @@ export function SwapView({
                         <button
                           type="button"
                           className={
-                            'jumpa-sheet-row jumpa-sheet-row--token' +
+                            'leet-sheet-row leet-sheet-row--token' +
                             (fromToken && addressesMatchPayToken(fromToken.address, t.address)
-                              ? ' jumpa-sheet-row--on'
+                              ? ' leet-sheet-row--on'
                               : '')
                           }
                           onClick={() => {
@@ -1714,16 +1714,16 @@ export function SwapView({
                             closeSheet();
                           }}
                         >
-                          <JumpaTokenWithBadge
+                          <LeetTokenWithBadge
                             tokenLogoURI={t.logoURI}
                             chainLogoURI={fromChainMeta?.logoURI}
                             size={36}
                             symbol={t.symbol}
                             subline={t.name.length > 42 ? `${t.name.slice(0, 40)}…` : t.name}
                           />
-                          <div className="jumpa-sheet-row-bal">
-                            <span className="jumpa-sheet-row-amt">{fmtBal(t)}</span>
-                            <span className="jumpa-sheet-row-usd">${fmtBalUsd(t)}</span>
+                          <div className="leet-sheet-row-bal">
+                            <span className="leet-sheet-row-amt">{fmtBal(t)}</span>
+                            <span className="leet-sheet-row-usd">${fmtBalUsd(t)}</span>
                           </div>
                         </button>
                       </li>
@@ -1735,25 +1735,25 @@ export function SwapView({
 
             {sheet === 'toNet' && (
               <>
-                <div className="jumpa-sheet-head">
+                <div className="leet-sheet-head">
                   <button
                     type="button"
-                    className="jumpa-sheet-back"
+                    className="leet-sheet-back"
                     onClick={() => setSheet('toToken')}
                     aria-label="Back"
                   >
                     ‹
                   </button>
-                  <h2 className="jumpa-sheet-h2">To network</h2>
+                  <h2 className="leet-sheet-h2">To network</h2>
                 </div>
                 {sheetSearch('Search network', toNetSearch, setToNetSearch)}
-                <ul className="jumpa-sheet-list">
+                <ul className="leet-sheet-list">
                   {filteredToChainsSheet.map(c => (
                     <li key={c.id}>
                       <button
                         type="button"
                         className={
-                          'jumpa-sheet-row' + (c.id === toChainId ? ' jumpa-sheet-row--on' : '')
+                          'leet-sheet-row' + (c.id === toChainId ? ' leet-sheet-row--on' : '')
                         }
                         onClick={() => {
                           setSwapSuccessCta(false);
@@ -1766,8 +1766,8 @@ export function SwapView({
                           setSheet('toToken');
                         }}
                       >
-                        <JumpaLiFiIcon logoURI={c.logoURI} label={c.name} size={34} rounded />
-                        <span className="jumpa-sheet-row-text">{c.name}</span>
+                        <LeetLiFiIcon logoURI={c.logoURI} label={c.name} size={34} rounded />
+                        <span className="leet-sheet-row-text">{c.name}</span>
                       </button>
                     </li>
                   ))}
@@ -1777,56 +1777,56 @@ export function SwapView({
 
             {sheet === 'toToken' && (
               <>
-                <div className="jumpa-sheet-head">
+                <div className="leet-sheet-head">
                   <button
                     type="button"
-                    className="jumpa-sheet-back"
+                    className="leet-sheet-back"
                     onClick={closeSheet}
                     aria-label="Back"
                   >
                     ‹
                   </button>
-                  <h2 className="jumpa-sheet-h2">You receive</h2>
+                  <h2 className="leet-sheet-h2">You receive</h2>
                 </div>
                 <button
                   type="button"
-                  className="jumpa-sheet-net-pill jumpa-sheet-net-pill--brand"
+                  className="leet-sheet-net-pill leet-sheet-net-pill--brand"
                   onClick={() => setSheet('toNet')}
                   disabled={!evmChains.length}
                 >
-                  <JumpaLiFiIcon
+                  <LeetLiFiIcon
                     logoURI={toChainMeta?.logoURI}
                     label={toChainId != null ? chainName(toChainId) : ' '}
                     size={28}
                     rounded
                   />
-                  <span className="jumpa-sheet-net-pill-stack">
-                    <span className="jumpa-sheet-net-pill-muted">Network</span>
-                    <span className="jumpa-sheet-net-pill-name">
+                  <span className="leet-sheet-net-pill-stack">
+                    <span className="leet-sheet-net-pill-muted">Network</span>
+                    <span className="leet-sheet-net-pill-name">
                       {toChainId != null ? chainName(toChainId) : '…'}
                     </span>
                   </span>
-                  <span className="jumpa-sheet-net-pill-chev" aria-hidden>
+                  <span className="leet-sheet-net-pill-chev" aria-hidden>
                     ›
                   </span>
                 </button>
                 {sheetSearch('Search token or address', toSearch, setToSearch)}
-                <ul className="jumpa-sheet-list">
+                <ul className="leet-sheet-list">
                   {!destTokens?.length && destBusy ? (
-                    <li className="jumpa-sheet-empty">Loading tokens…</li>
+                    <li className="leet-sheet-empty">Loading tokens…</li>
                   ) : destErr ? (
-                    <li className="jumpa-sheet-empty">{destErr}</li>
+                    <li className="leet-sheet-empty">{destErr}</li>
                   ) : !filteredToTokens.length ? (
-                    <li className="jumpa-sheet-empty">No match</li>
+                    <li className="leet-sheet-empty">No match</li>
                   ) : (
                     filteredToTokens.map(t => (
                       <li key={t.address + t.symbol}>
                         <button
                           type="button"
                           className={
-                            'jumpa-sheet-row jumpa-sheet-row--token' +
+                            'leet-sheet-row leet-sheet-row--token' +
                             (toToken && addressesMatchPayToken(toToken.address, t.address)
-                              ? ' jumpa-sheet-row--on'
+                              ? ' leet-sheet-row--on'
                               : '')
                           }
                           onClick={() => {
@@ -1842,7 +1842,7 @@ export function SwapView({
                             closeSheet();
                           }}
                         >
-                          <JumpaTokenWithBadge
+                          <LeetTokenWithBadge
                             tokenLogoURI={t.logoURI}
                             chainLogoURI={toChainMeta?.logoURI}
                             size={36}
@@ -1862,7 +1862,7 @@ export function SwapView({
 
   if (embedded) {
     return (
-      <div className="jumpa jumpa--swap jumpa--embedded">
+      <div className="leet leet--swap leet--embedded">
         {body}
         {sheets}
       </div>
@@ -1871,16 +1871,16 @@ export function SwapView({
 
   return (
     <div
-      className={`wallet-shell jumpa jumpa--swap${walletTab === 'swap' ? '' : ' jumpa--wallet-subtab'}`}
+      className={`wallet-shell leet leet--swap${walletTab === 'swap' ? '' : ' leet--wallet-subtab'}`}
     >
       <ScreenHeader title={walletTitle} trailing={settingsBtn} />
 
-      <nav className="jumpa-wallet-tabs" aria-label="Wallet sections">
+      <nav className="leet-wallet-tabs" aria-label="Wallet sections">
         {(['swap', 'defi', 'history'] as const).map(t => (
           <button
             key={t}
             type="button"
-            className={`jumpa-wallet-tabs__btn${walletTab === t ? ' jumpa-wallet-tabs__btn--on' : ''}`}
+            className={`leet-wallet-tabs__btn${walletTab === t ? ' leet-wallet-tabs__btn--on' : ''}`}
             aria-current={walletTab === t ? 'page' : undefined}
             onClick={() => setWalletTab(t)}
           >

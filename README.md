@@ -1,6 +1,6 @@
-# BurnBox (Chrome extension)
+# 1337 Wallet (Chrome extension)
 
-Developer EVM burner wallet — create/import keys, swap via [LI.FI](https://li.fi), multi-send, RPC switcher, and MetaMask-compatible dapp connection.
+**1337** — developer EVM burner wallet. Create/import keys, swap via [LI.FI](https://li.fi), multi-send, RPC switcher, and MetaMask-compatible dapp connection. Styled after [1337 Skulls Wallet](https://chromewebstore.google.com/detail/1337-skulls-wallet/maggcienpliglmghmmfbnnmjclmopglk).
 
 ## Features
 

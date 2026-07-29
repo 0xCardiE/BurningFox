@@ -104,15 +104,17 @@ chrome.storage.onChanged.addListener((changes, area) => {
 void syncToolbarOpenModeFromSettings();
 void loadPersistedSettingsOnStart();
 
-const SESSION_KEY = 'burn_box_session_pk';
+const SESSION_KEY = 'l33t_session_pk';
 /** Legacy session keys — read once then cleared after unlock. */
 const LEGACY_SESSION_KEYS = [
+  'burn_box_session_pk',
   'burning_fox_session_pk',
   'jumpa_session_pk',
   'beewallet_session_pk',
 ] as const;
-const ACTIVITY_KEY = 'burn_box_last_activity';
+const ACTIVITY_KEY = 'l33t_last_activity';
 const LEGACY_ACTIVITY_KEYS = [
+  'burn_box_last_activity',
   'burning_fox_last_activity',
   'jumpa_last_activity',
   'beewallet_last_activity',
@@ -134,7 +136,7 @@ async function emitToTab(
       target: { tabId },
       world: 'MAIN',
       func: (ev: { type: string; chainId?: string; accounts?: string[] }) => {
-        const channel = 'burnbox-provider';
+        const channel = 'l33t-provider';
         window.postMessage({ channel, target: 'inpage', type: 'event', event: ev }, '*');
         const eth = (window as Window & { ethereum?: { request?: (a: unknown) => Promise<unknown> } })
           .ethereum;
@@ -445,7 +447,7 @@ chrome.runtime.onMessage.addListener(
           }
           const pk = await sessionPrivateKey();
           if (!pk) {
-            sendResponse({ ok: false, error: 'Unlock BurnBox first' });
+            sendResponse({ ok: false, error: 'Unlock 1337 first' });
             return;
           }
           const entry = takePendingApproval(id);
@@ -515,7 +517,7 @@ chrome.runtime.onMessage.addListener(
           const pk = await sessionPrivateKey();
           if (!pk) {
             void openWalletUi();
-            sendResponse({ ok: false, error: 'Unlock BurnBox first' });
+            sendResponse({ ok: false, error: 'Unlock 1337 first' });
             return;
           }
           const status = await buildDappConnectionStatus();

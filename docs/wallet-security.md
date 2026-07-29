@@ -1,6 +1,6 @@
-# Wallet security model (BurnBox extension)
+# Wallet security model (1337 extension)
 
-This note describes how signing works in BurnBox and how to keep risk lower in practice. For a full **MetaMask vs BurnBox** comparison across vault crypto, session storage, auto-lock, dApp signing, and related topics, see **[wallet-comparison-metamask.md](./wallet-comparison-metamask.md)**.
+This note describes how signing works in 1337 and how to keep risk lower in practice. For a full **MetaMask vs 1337** comparison across vault crypto, session storage, auto-lock, dApp signing, and related topics, see **[wallet-comparison-metamask.md](./wallet-comparison-metamask.md)**.
 
 ## What the extension does today
 
@@ -14,7 +14,7 @@ Extension UI actions (swap, send, etc.) also sign via the unlocked account witho
 
 ## Compared to MetaMask (short)
 
-MetaMask’s main end-user advantage is **separation + explicit review**: the dapp is untrusted, and the wallet UI confirms every sign/send by default. BurnBox defaults to **speed** — stay unlocked, persist session across UI close, and auto-sign dApp traffic in Turbo mode. Both are **hot software wallets**; see the [full comparison table](./wallet-comparison-metamask.md) for all 17 security topics.
+MetaMask’s main end-user advantage is **separation + explicit review**: the dapp is untrusted, and the wallet UI confirms every sign/send by default. 1337 defaults to **speed** — stay unlocked, persist session across UI close, and auto-sign dApp traffic in Turbo mode. Both are **hot software wallets**; see the [full comparison table](./wallet-comparison-metamask.md) for all 17 security topics.
 
 ## Remaining risks (even extension-only)
 
