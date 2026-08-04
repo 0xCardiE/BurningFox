@@ -4,9 +4,11 @@ Developer EVM burner wallet — create/import keys, swap via [LI.FI](https://li.
 
 ## Features
 
-- **Multi-account** — create/import multiple local keys, pick the active account in the header
+- **Multi-account** — seed-derived HD accounts and/or imported keys; pick the active account in the header
+- **Seed phrase** — create or import BIP-39 (12–24 words), same path style as MetaMask (`m/44'/60'/0'/0/n`)
+- **Private key** — generate or import a single hex key (burner-style)
 - **Hardware wallets** — connect Ledger (WebHID) or Trezor Connect; sign txs on-device
-- **Burner wallet** — generate or import a private key for testing (password encrypts local vault only)
+- **Security docs** — [MetaMask comparison by wallet type](docs/wallet-comparison-metamask.md)
 - **Swaps** — cross-chain token swaps powered by LI.FI
 - **Multi-send** — paste a list of addresses and send native or ERC-20 to each (local key accounts)
 - **Networks** — 20 popular chains with pre-filled public RPCs; switch endpoint from a dropdown
