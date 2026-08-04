@@ -1,7 +1,9 @@
 import { decodeFunctionResult, encodeFunctionData } from 'viem';
 import type { TransactionRequest } from '@lifi/types';
 import { healthyRpcUrlsFor } from './chainRpcRegistry';
-import { getUnlockedAccount } from './accountSession';
+import { getActiveAccountMeta, getUnlockedAccount } from './accountSession';
+import { isHardwareAccount } from './accounts';
+import { signAndSendWithHardware } from './hardwareSign';
 import { ERC20_ABI, MULTICALL3_ABI, MULTICALL3_ADDRESS } from './abis';
 import {
   classifyRpcFailure,
@@ -252,6 +254,7 @@ export async function sendTransactionRequest(
   tr: TransactionRequest,
 ): Promise<string> {
   const account = getUnlockedAccount();
+  const meta = getActiveAccountMeta();
   if (!account) {
     throw new Error('Wallet is locked. Unlock to send a transaction.');
   }
@@ -275,6 +278,49 @@ export async function sendTransactionRequest(
   const maxFee = bigIntish(tr.maxFeePerGas);
   const maxPrio = bigIntish(tr.maxPriorityFeePerGas);
   const legacyGas = bigIntish(tr.gasPrice);
+
+  if (meta && isHardwareAccount(meta)) {
+    let tx;
+    if (maxFee !== undefined) {
+      const prio = maxPrio ?? maxFee / 10n;
+      tx = {
+        chainId,
+        type: 'eip1559' as const,
+        nonce,
+        gas: gasBuffered,
+        maxFeePerGas: maxFee,
+        maxPriorityFeePerGas: prio,
+        to: tr.to as `0x${string}`,
+        value,
+        data: (tr.data as `0x${string}`) ?? '0x',
+      };
+    } else if (legacyGas !== undefined) {
+      tx = {
+        chainId,
+        type: 'legacy' as const,
+        nonce,
+        gas: gasBuffered,
+        gasPrice: legacyGas,
+        to: tr.to as `0x${string}`,
+        value,
+        data: (tr.data as `0x${string}`) ?? '0x',
+      };
+    } else {
+      const gasPrice = await getGasPrice(chainId);
+      tx = {
+        chainId,
+        type: 'eip1559' as const,
+        nonce,
+        gas: gasBuffered,
+        maxFeePerGas: (gasPrice * 150n) / 100n,
+        maxPriorityFeePerGas: gasPrice / 10n,
+        to: tr.to as `0x${string}`,
+        value,
+        data: (tr.data as `0x${string}`) ?? '0x',
+      };
+    }
+    return signAndSendWithHardware({ account: meta, chainId, tx });
+  }
 
   let signed: `0x${string}`;
 

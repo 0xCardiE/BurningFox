@@ -96,13 +96,23 @@ export async function handleProviderRpc(
   pk: `0x${string}` | null,
   request: ProviderRequest,
   origin?: string,
-  opts?: { tabId?: number; onApprovalQueued?: () => void },
+  opts?: {
+    tabId?: number;
+    onApprovalQueued?: () => void;
+    sessionAddress?: `0x${string}`;
+    hardware?: boolean;
+  },
 ): Promise<ProviderRpcResult> {
   const { id, method, params = [] } = request;
   let chainId = 1;
   try {
     const { settings } = await loadPersisted();
     chainId = effectiveActiveChainId(settings);
+    const sessionAddr = pk
+      ? getAddress(addressFromPrivateKey(pk))
+      : opts?.sessionAddress
+        ? getAddress(opts.sessionAddress)
+        : null;
 
     if (method === 'eth_chainId') {
       return { id, ok: true, result: toHexChainId(chainId) };
@@ -113,7 +123,7 @@ export async function handleProviderRpc(
     }
 
     if (method === 'eth_accounts' || method === 'eth_requestAccounts') {
-      if (!pk) {
+      if (!sessionAddr) {
         if (method === 'eth_requestAccounts') {
           throw Object.assign(new Error('BurnBox is locked. Unlock the extension first.'), {
             code: 4100,
@@ -121,18 +131,17 @@ export async function handleProviderRpc(
         }
         return { id, ok: true, result: [] };
       }
-      const addr = getAddress(addressFromPrivateKey(pk));
       if (method === 'eth_requestAccounts') {
         if (origin) await connectOrigin(origin);
-        return { id, ok: true, result: [addr] };
+        return { id, ok: true, result: [sessionAddr] };
       }
       if (origin && !(await isOriginConnected(origin))) {
         return { id, ok: true, result: [] };
       }
-      return { id, ok: true, result: [addr] };
+      return { id, ok: true, result: [sessionAddr] };
     }
 
-    if (!pk) {
+    if (!sessionAddr) {
       throw Object.assign(new Error('BurnBox is locked. Unlock the extension first.'), {
         code: 4100,
       });
@@ -220,7 +229,10 @@ export async function handleProviderRpc(
     }
 
     if (isSignMethod(method)) {
-      if (effectiveTxConfirmMode(settings) === 'normal') {
+      // Hardware always needs a device confirm in the wallet UI.
+      const mustConfirm =
+        opts?.hardware || !pk || effectiveTxConfirmMode(settings) === 'normal';
+      if (mustConfirm) {
         const approval = await queueApprovalRequest({
           request,
           origin,

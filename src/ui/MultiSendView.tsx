@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { getAddress, isAddress, parseUnits } from 'viem';
-import { getSessionPrivateKey } from '../lib/accountSession';
+import { getActiveAccountMeta, getSessionPrivateKey } from '../lib/accountSession';
+import { isHardwareAccount } from '../lib/accounts';
 import { effectiveActiveChainId, type AppSettings } from '../lib/storageState';
 import { chainById } from '../lib/chainCatalog';
 import {
@@ -25,8 +26,13 @@ export function MultiSendView({ settings }: { settings: AppSettings }) {
   async function submit() {
     setErr(null);
     setLog([]);
+    const meta = getActiveAccountMeta();
     if (!account) {
-      setErr('Wallet must be unlocked with a private key.');
+      setErr(
+        meta && isHardwareAccount(meta)
+          ? 'Multi-send currently requires a local key account. Switch active account in Settings.'
+          : 'Wallet must be unlocked with a private key.',
+      );
       return;
     }
     const pk = account;

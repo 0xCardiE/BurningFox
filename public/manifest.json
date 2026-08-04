@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "BurnBox",
-  "version": "2.0.0",
-  "description": "Developer EVM burner wallet — swap via LI.FI, multi-send, RPC switcher, and MetaMask-compatible dapp connection.",
+  "version": "2.1.0",
+  "description": "Developer EVM burner wallet — multi-account, Ledger/Trezor, LI.FI swaps, multi-send, and MetaMask-compatible dapp connection.",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -39,11 +39,20 @@
       "js": ["content.js"],
       "run_at": "document_start",
       "all_frames": true
+    },
+    {
+      "matches": ["https://connect.trezor.io/*"],
+      "js": ["vendor/trezor-content-script.js"],
+      "all_frames": true,
+      "run_at": "document_start"
     }
   ],
-  "permissions": ["storage", "sidePanel", "windows", "tabs", "scripting"],
+  "permissions": ["storage", "sidePanel", "windows", "tabs", "scripting", "hid"],
   "host_permissions": ["<all_urls>"],
+  "externally_connectable": {
+    "matches": ["https://*.trezor.io/*", "https://connect.trezor.io/*"]
+  },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; img-src 'self' https: http: data: blob:;"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; img-src 'self' https: http: data: blob:;"
   }
 }

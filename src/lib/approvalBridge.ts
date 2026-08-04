@@ -42,3 +42,22 @@ export async function resolvePendingApproval(
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 }
+
+/** Resolve a pending dapp request after the UI signed it (e.g. hardware wallet). */
+export async function completePendingApproval(
+  id: string,
+  result?: unknown,
+  error?: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = (await sendMessage<{ ok: boolean; error?: string }>({
+      type: 'COMPLETE_PENDING_APPROVAL',
+      id,
+      result,
+      error,
+    })) as { ok: boolean; error?: string };
+    return res ?? { ok: false, error: 'No response' };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
