@@ -1,13 +1,5 @@
 import { useState } from 'react';
-import {
-  accountFromPrivateKey,
-  generateNewPrivateKey,
-  parseImportPrivateKey,
-} from '../lib/walletCore';
-import { encryptPrivateKey } from '../lib/vault';
-import { setVault } from '../lib/storageState';
-import { setUnlockedAccount } from '../lib/accountSession';
-import { persistSessionPrivateKey } from '../lib/sessionBridge';
+import { createInitialWallet, importInitialWallet } from '../lib/walletManager';
 import { ScreenHeader } from './ScreenHeader';
 
 type Mode = 'create' | 'import';
@@ -34,12 +26,8 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
     }
     setBusy(true);
     try {
-      const pk = generateNewPrivateKey();
-      const vault = await encryptPrivateKey(pk, password);
-      await setVault(vault);
-      setUnlockedAccount(accountFromPrivateKey(pk), pk);
-      await persistSessionPrivateKey(pk);
-      setBackupKey(pk);
+      const { privateKey } = await createInitialWallet(password);
+      setBackupKey(privateKey);
       setShowBackup(true);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -60,11 +48,7 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
     }
     setBusy(true);
     try {
-      const pk = parseImportPrivateKey(importKey);
-      const vault = await encryptPrivateKey(pk, password);
-      await setVault(vault);
-      setUnlockedAccount(accountFromPrivateKey(pk), pk);
-      await persistSessionPrivateKey(pk);
+      await importInitialWallet(password, importKey);
       onReady();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -106,94 +90,71 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
     <div className="wallet-shell bfox">
       <ScreenHeader title="BurnBox" />
       <div className="screen-body">
-        <p className="muted" style={{ marginTop: 0 }}>
-          A developer burner wallet for testing. Create or import a private key — not meant for
-          securing real funds. Password only encrypts local storage in this browser.
+        <p className="muted" style={{ marginBottom: 14 }}>
+          Developer burner wallet. Create or import a private key — encrypted locally with your
+          password. You can add more accounts (including Ledger / Trezor) later in Settings.
         </p>
-        <div className="nav" style={{ marginBottom: 12 }}>
+
+        <div className="row" style={{ marginBottom: 14 }}>
           <button
             type="button"
             className={mode === 'create' ? 'primary' : 'ghost'}
-            onClick={() => {
-              setMode('create');
-              setErr(null);
-            }}
+            onClick={() => setMode('create')}
           >
             Create
           </button>
           <button
             type="button"
             className={mode === 'import' ? 'primary' : 'ghost'}
-            onClick={() => {
-              setMode('import');
-              setErr(null);
-            }}
+            onClick={() => setMode('import')}
           >
-            Import
+            Import key
           </button>
         </div>
-        {mode === 'import' && (
-          <>
-            <p
-              className="muted"
-              style={{
-                fontSize: 12,
-                marginBottom: 10,
-                padding: 10,
-                borderLeft: '3px solid var(--accent)',
-                background: 'rgba(255, 122, 0, 0.08)',
-              }}
-            >
-              Import only keys you created yourself on a trusted device. If anyone else gave you
-              this key or a site generated it for you, assume it is compromised.
-            </p>
-            <label htmlFor="imp">Private key (hex)</label>
-            <textarea
-              id="imp"
-              value={importKey}
-              onChange={e => setImportKey(e.target.value)}
-              autoComplete="off"
-              placeholder="0x…"
-              spellCheck={false}
-            />
-          </>
-        )}
+
         <label htmlFor="pw">Password (encrypts local vault)</label>
         <input
           id="pw"
           type="password"
+          autoComplete="new-password"
           value={password}
           onChange={e => setPassword(e.target.value)}
-          autoComplete="new-password"
         />
         <label htmlFor="pw2">Confirm password</label>
         <input
           id="pw2"
           type="password"
+          autoComplete="new-password"
           value={password2}
           onChange={e => setPassword2(e.target.value)}
-          autoComplete="new-password"
         />
-        {err && <p className="error">{err}</p>}
-        {mode === 'create' ? (
-          <button
-            type="button"
-            style={{ marginTop: 12, width: '100%' }}
-            disabled={busy}
-            onClick={() => void handleCreate()}
-          >
-            {busy ? '…' : 'Generate wallet'}
-          </button>
-        ) : (
-          <button
-            type="button"
-            style={{ marginTop: 12, width: '100%' }}
-            disabled={busy}
-            onClick={() => void handleImport()}
-          >
-            {busy ? '…' : 'Import and encrypt'}
-          </button>
-        )}
+
+        {mode === 'import' ? (
+          <>
+            <label htmlFor="pk">Private key</label>
+            <textarea
+              id="pk"
+              className="mono"
+              rows={3}
+              placeholder="0x… or 64 hex chars"
+              value={importKey}
+              onChange={e => setImportKey(e.target.value)}
+              spellCheck={false}
+            />
+          </>
+        ) : null}
+
+        {err ? <p className="error">{err}</p> : null}
+
+        <button
+          type="button"
+          className="primary"
+          style={{ width: '100%', marginTop: 12 }}
+          disabled={busy}
+          onClick={() => void (mode === 'create' ? handleCreate() : handleImport())}
+        >
+          {busy ? 'Working…' : mode === 'create' ? 'Create wallet' : 'Import wallet'}
+        </button>
       </div>
     </div>
   );

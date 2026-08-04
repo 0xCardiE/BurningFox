@@ -1,87 +1,74 @@
 import { useEffect, useState } from 'react';
-import { decryptPrivateKey } from '../lib/vault';
 import { loadPersisted } from '../lib/storageState';
-import { unlockWithPersistedSession } from '../lib/sessionBridge';
-import type { EncryptedVault } from '../lib/vault';
-import { BurnBoxMark } from './BurnBoxLogo';
+import { unlockWallet } from '../lib/walletManager';
+import { ScreenHeader } from './ScreenHeader';
 
 export function Unlock({ onUnlocked }: { onUnlocked: () => void }) {
-  const [vault, setVault] = useState<EncryptedVault | null | undefined>(undefined);
+  const [hasVault, setHasVault] = useState<boolean | undefined>(undefined);
   const [password, setPassword] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    void loadPersisted().then((s) => setVault(s.vault));
+    void loadPersisted().then(s => setHasVault(s.vault != null));
   }, []);
 
-  async function submit() {
-    if (!vault) return;
-    setErr(null);
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!hasVault) return;
     setBusy(true);
+    setErr(null);
     try {
-      const pk = await decryptPrivateKey(vault, password);
-      await unlockWithPersistedSession(pk);
+      await unlockWallet(password);
       onUnlocked();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : String(error));
     } finally {
       setBusy(false);
     }
   }
 
-  if (vault === undefined) {
+  if (hasVault === undefined) {
     return (
-      <div className="unlock-screen unlock-screen--loading">
-        <p className="unlock-loading">Loading…</p>
+      <div className="wallet-shell bfox">
+        <ScreenHeader title="BurnBox" />
+        <p className="muted panel">Loading…</p>
       </div>
     );
   }
-  if (vault === null) {
+
+  if (!hasVault) {
     return (
       <p className="panel error">No vault found. Reload the extension.</p>
     );
   }
 
   return (
-    <div className="unlock-screen">
-      <div className="unlock-brand">
-        <BurnBoxMark className="unlock-logo" size={88} />
-        <h1 className="unlock-title">BurnBox</h1>
-        <p className="unlock-lead">
-          Developer burner wallet — unlock to sign swaps, multi-sends, and dapp transactions
-          locally. Not for securing real funds.
+    <div className="wallet-shell bfox">
+      <ScreenHeader title="Unlock" />
+      <form className="screen-body" onSubmit={e => void submit(e)}>
+        <p className="muted" style={{ marginBottom: 12 }}>
+          Enter your password to decrypt local keys. Hardware accounts are available after unlock.
         </p>
-      </div>
-
-      <div className="unlock-form">
-        <label htmlFor="upw" className="unlock-label">
-          Password
-        </label>
+        <label htmlFor="unlock-pw">Password</label>
         <input
-          id="upw"
+          id="unlock-pw"
           type="password"
-          className="unlock-input"
-          value={password}
-          placeholder="Enter your password"
-          onChange={(e) => setPassword(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') void submit();
-          }}
           autoComplete="current-password"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          autoFocus
         />
-        {err && <p className="unlock-error">{err}</p>}
+        {err ? <p className="error">{err}</p> : null}
         <button
-          type="button"
-          className="unlock-submit"
+          type="submit"
+          className="primary"
+          style={{ width: '100%', marginTop: 12 }}
           disabled={busy || !password}
-          onClick={() => void submit()}
         >
-          {busy ? '…' : 'Unlock'}
+          {busy ? 'Unlocking…' : 'Unlock'}
         </button>
-      </div>
-
-      <div className="unlock-footer-art" aria-hidden="true" />
+      </form>
     </div>
   );
 }

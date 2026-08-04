@@ -1,7 +1,7 @@
-import { useState, type ReactNode } from 'react';
-import { getAddress } from 'viem';
+import { useEffect, useState, type ReactNode } from 'react';
 import { getUnlockedAccount } from '../lib/accountSession';
 import type { AppSettings } from '../lib/storageState';
+import { AccountSwitcher } from './AccountSwitcher';
 import { NetworkSelector } from './NetworkSelector';
 import { DappConnectionBar } from './DappConnectionBar';
 import { TxApprovalSheet } from './TxApprovalSheet';
@@ -15,11 +15,6 @@ const TAB_LABELS: Record<WalletMainTab, string> = {
   history: 'History',
   tools: 'Tools',
 };
-
-function shortAddress(addr: string): string {
-  if (addr.length < 12) return addr;
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
-}
 
 export function WalletLayout({
   activeTab,
@@ -36,20 +31,14 @@ export function WalletLayout({
   onSaved: () => void;
   children: ReactNode;
 }) {
+  const [, setTick] = useState(0);
   const account = getUnlockedAccount();
-  const addr = account ? getAddress(account.address) : null;
-  const [copyFlash, setCopyFlash] = useState(false);
 
-  async function copyAddress() {
-    if (!addr) return;
-    try {
-      await navigator.clipboard.writeText(addr);
-      setCopyFlash(true);
-      window.setTimeout(() => setCopyFlash(false), 1500);
-    } catch {
-      /* ignore */
-    }
-  }
+  useEffect(() => {
+    const bump = () => setTick(t => t + 1);
+    window.addEventListener('burnbox-account-changed', bump);
+    return () => window.removeEventListener('burnbox-account-changed', bump);
+  }, []);
 
   const settingsBtn = (
     <button
@@ -68,16 +57,8 @@ export function WalletLayout({
   return (
     <div className="wallet-shell bfox bfox--main">
       <header className="screen-header bfox-main-header">
-        {addr ? (
-          <button
-            type="button"
-            className="bfox-main-header__addr mono"
-            onClick={() => void copyAddress()}
-            title={addr}
-            aria-label="Copy wallet address"
-          >
-            {copyFlash ? 'Copied!' : shortAddress(addr)}
-          </button>
+        {account ? (
+          <AccountSwitcher onChanged={onSaved} />
         ) : (
           <span className="bfox-main-header__addr bfox-main-header__addr--empty muted">
             Locked

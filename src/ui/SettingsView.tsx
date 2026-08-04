@@ -17,6 +17,7 @@ import {
   type ToolbarOpenMode,
 } from '../lib/storageState';
 import { describeError } from '../lib/utils';
+import { AccountsPanel } from './AccountsPanel';
 import { ScreenHeader } from './ScreenHeader';
 
 export function SettingsView({
@@ -149,6 +150,17 @@ export function SettingsView({
       <ScreenHeader title="Settings" onClose={onBack} />
       <div className="screen-body settings-panel">
         <div className="settings-body">
+          <div
+            style={{
+              marginBottom: 18,
+              padding: 10,
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+            }}
+          >
+            <AccountsPanel onChanged={onSaved} />
+          </div>
+
           {walletAddress ? (
             <div
               className="muted"
@@ -161,7 +173,7 @@ export function SettingsView({
                 lineHeight: 1.45,
               }}
             >
-              <strong style={{ color: 'var(--text)' }}>Wallet</strong>
+              <strong style={{ color: 'var(--text)' }}>Active wallet</strong>
 
               <p style={{ margin: '10px 0 4px' }} className="mono">
                 {walletAddress}

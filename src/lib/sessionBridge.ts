@@ -1,9 +1,28 @@
-import { setUnlockedAccount } from './accountSession';
-import type { ToolbarOpenMode } from './storageState';
+import {
+  activateAccount,
+  clearAccountSession,
+  setAccountsMeta,
+  setLocalKeys,
+  setUnlockedAccount,
+} from './accountSession';
+import type { AccountKind } from './accounts';
+import { loadPersisted, type ToolbarOpenMode } from './storageState';
 import { accountFromPrivateKey } from './walletCore';
 
+export type HardwareSession = {
+  kind: 'ledger' | 'trezor';
+  accountId: string;
+  address: string;
+  derivationPath: string;
+};
+
 type SessionResponse =
-  | { ok: true; privateKeyHex: string }
+  | { ok: true; privateKeyHex: string; session?: undefined }
+  | {
+      ok: true;
+      privateKeyHex?: undefined;
+      session: HardwareSession;
+    }
   | { ok: false; error?: string };
 
 type PingResponse = { ok: boolean };
@@ -27,11 +46,38 @@ export async function hydrateAccountFromBackground(): Promise<boolean> {
     const res = (await sendMessage<SessionResponse>({
       type: 'GET_SESSION',
     })) as SessionResponse;
-    if (!res?.ok || !('privateKeyHex' in res) || !res.privateKeyHex) {
+    if (!res?.ok) return false;
+
+    const persisted = await loadPersisted();
+    setAccountsMeta(persisted.accounts, persisted.activeAccountId);
+
+    if (res.session && (res.session.kind === 'ledger' || res.session.kind === 'trezor')) {
+      // Hardware session — no local keys in background; user must unlock again for local keys.
+      // If accounts meta has this hardware account, activate it for address-only UI.
+      const id = res.session.accountId;
+      if (persisted.accounts.some(a => a.id === id)) {
+        activateAccount(id);
+        return true;
+      }
+      return false;
+    }
+
+    if (!('privateKeyHex' in res) || !res.privateKeyHex) {
       return false;
     }
     const hex = res.privateKeyHex as `0x${string}`;
-    setUnlockedAccount(accountFromPrivateKey(hex), hex);
+    // Without password we can't rebuild the full local key map; hydrate single active key.
+    const account = accountFromPrivateKey(hex);
+    const match = persisted.accounts.find(
+      a => a.kind === 'local' && a.address.toLowerCase() === account.address.toLowerCase(),
+    );
+    if (match) {
+      setLocalKeys({ [match.id]: hex });
+      setAccountsMeta(persisted.accounts, match.id);
+      activateAccount(match.id);
+    } else {
+      setUnlockedAccount(account, hex);
+    }
     return true;
   } catch {
     return false;
@@ -59,6 +105,7 @@ export async function clearSessionInBackground(): Promise<void> {
 /** Clear background session and local unlocked account (explicit Lock). */
 export async function lockWallet(): Promise<void> {
   await clearSessionInBackground();
+  clearAccountSession();
   setUnlockedAccount(null, null);
 }
 
@@ -81,7 +128,7 @@ async function browserWindowIdForSidePanel(): Promise<number | undefined> {
   }
   try {
     const wins = await chrome.windows.getAll({ windowTypes });
-    const focused = wins.find((x) => x.focused && x.id != null);
+    const focused = wins.find(x => x.focused && x.id != null);
     if (focused?.id != null) return focused.id;
     return wins[0]?.id;
   } catch {
@@ -132,15 +179,25 @@ export async function verifyBackgroundSessionStillUnlocked(): Promise<boolean> {
     const res = (await sendMessage<SessionResponse>({
       type: 'GET_SESSION',
     })) as SessionResponse;
-    if (!res?.ok || !('privateKeyHex' in res) || !res.privateKeyHex) {
+    if (!res?.ok) {
+      clearAccountSession();
       setUnlockedAccount(null, null);
       return false;
     }
-    const hex = res.privateKeyHex as `0x${string}`;
-    setUnlockedAccount(accountFromPrivateKey(hex), hex);
-    return true;
+    if (res.session) {
+      return hydrateAccountFromBackground();
+    }
+    if (!res.privateKeyHex) {
+      clearAccountSession();
+      setUnlockedAccount(null, null);
+      return false;
+    }
+    return hydrateAccountFromBackground();
   } catch {
+    clearAccountSession();
     setUnlockedAccount(null, null);
     return false;
   }
 }
+
+export type { AccountKind };
