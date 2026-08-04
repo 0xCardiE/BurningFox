@@ -99,12 +99,18 @@ export async function encryptPrivateKey(
   };
 }
 
-/** @deprecated Prefer decryptLocalKeys */
+export interface VaultSecrets {
+  keys: Record<string, `0x${string}`>;
+  /** Optional BIP-39 mnemonic (encrypted with the same vault password). */
+  mnemonic?: string;
+}
+
+/** @deprecated Prefer decryptVaultSecrets */
 export async function decryptPrivateKey(
   vault: EncryptedVault,
   password: string,
 ): Promise<`0x${string}`> {
-  const keys = await decryptLocalKeys(vault, password);
+  const { keys } = await decryptVaultSecrets(vault, password);
   const first = Object.values(keys)[0];
   if (!first) throw new Error('Vault has no keys');
   return first;
@@ -113,11 +119,23 @@ export async function decryptPrivateKey(
 export async function encryptLocalKeys(
   keys: Record<string, `0x${string}`>,
   password: string,
+  mnemonic?: string,
+): Promise<EncryptedVaultV2> {
+  return encryptVaultSecrets({ keys, mnemonic }, password);
+}
+
+export async function encryptVaultSecrets(
+  secrets: VaultSecrets,
+  password: string,
 ): Promise<EncryptedVaultV2> {
   const salt = crypto.getRandomValues(new Uint8Array(SALT_LEN));
   const iv = crypto.getRandomValues(new Uint8Array(IV_LEN));
   const key = await deriveKey(password, salt);
-  const payload = new TextEncoder().encode(JSON.stringify(keys));
+  const body: VaultSecrets = {
+    keys: secrets.keys,
+    ...(secrets.mnemonic?.trim() ? { mnemonic: secrets.mnemonic.trim() } : {}),
+  };
+  const payload = new TextEncoder().encode(JSON.stringify(body));
   const ct = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv: iv as BufferSource },
     key,
@@ -131,10 +149,19 @@ export async function encryptLocalKeys(
   };
 }
 
+/** @deprecated Prefer decryptVaultSecrets */
 export async function decryptLocalKeys(
   vault: EncryptedVault,
   password: string,
 ): Promise<Record<string, `0x${string}`>> {
+  const { keys } = await decryptVaultSecrets(vault, password);
+  return keys;
+}
+
+export async function decryptVaultSecrets(
+  vault: EncryptedVault,
+  password: string,
+): Promise<VaultSecrets> {
   if (vault.v !== 1 && vault.v !== 2) {
     throw new Error('Unsupported vault version');
   }
@@ -158,7 +185,7 @@ export async function decryptLocalKeys(
       throw new Error('Decrypted key has invalid length');
     }
     const pk = bytesToHex(new Uint8Array(plain));
-    return { legacy: pk };
+    return { keys: { legacy: pk } };
   }
 
   const text = new TextDecoder().decode(plain);
@@ -171,8 +198,15 @@ export async function decryptLocalKeys(
   if (!parsed || typeof parsed !== 'object') {
     throw new Error('Corrupted vault payload');
   }
+
+  const row = parsed as Record<string, unknown>;
+  const keysRaw =
+    row.keys && typeof row.keys === 'object'
+      ? (row.keys as Record<string, unknown>)
+      : row;
   const out: Record<string, `0x${string}`> = {};
-  for (const [id, value] of Object.entries(parsed as Record<string, unknown>)) {
+  for (const [id, value] of Object.entries(keysRaw)) {
+    if (id === 'mnemonic' || id === 'keys') continue;
     if (typeof value !== 'string') continue;
     if (!/^0x[0-9a-fA-F]{64}$/.test(value)) continue;
     out[id] = value.toLowerCase() as `0x${string}`;
@@ -180,5 +214,10 @@ export async function decryptLocalKeys(
   if (Object.keys(out).length === 0) {
     throw new Error('Vault has no keys');
   }
-  return out;
+
+  const mnemonic =
+    typeof row.mnemonic === 'string' && row.mnemonic.trim()
+      ? row.mnemonic.trim()
+      : undefined;
+  return { keys: out, mnemonic };
 }

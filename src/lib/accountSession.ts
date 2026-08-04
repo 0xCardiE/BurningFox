@@ -9,6 +9,7 @@ import {
 let unlocked: PrivateKeyAccount | null = null;
 let sessionPrivateKey: `0x${string}` | null = null;
 let sessionPassword: string | null = null;
+let sessionMnemonic: string | null = null;
 let localKeys = new Map<string, `0x${string}`>();
 let accounts: WalletAccount[] = [];
 let activeAccountId: string | undefined;
@@ -19,6 +20,18 @@ export function setSessionPassword(password: string | null): void {
 
 export function getSessionPassword(): string | null {
   return sessionPassword;
+}
+
+export function setSessionMnemonic(mnemonic: string | null): void {
+  sessionMnemonic = mnemonic;
+}
+
+export function getSessionMnemonic(): string | null {
+  return sessionMnemonic;
+}
+
+export function hasSessionMnemonic(): boolean {
+  return Boolean(sessionMnemonic);
 }
 
 export function setAccountsMeta(
@@ -126,6 +139,7 @@ export function clearAccountSession(): void {
   unlocked = null;
   sessionPrivateKey = null;
   sessionPassword = null;
+  sessionMnemonic = null;
   localKeys = new Map();
   accounts = [];
   activeAccountId = undefined;
