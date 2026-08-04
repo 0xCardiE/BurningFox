@@ -4,9 +4,11 @@ Developer EVM burner wallet — create/import keys, swap via [LI.FI](https://li.
 
 ## Features
 
+- **Multi-account** — create/import multiple local keys, pick the active account in the header
+- **Hardware wallets** — connect Ledger (WebHID) or Trezor Connect; sign txs on-device
 - **Burner wallet** — generate or import a private key for testing (password encrypts local vault only)
 - **Swaps** — cross-chain token swaps powered by LI.FI
-- **Multi-send** — paste a list of addresses and send native or ERC-20 to each
+- **Multi-send** — paste a list of addresses and send native or ERC-20 to each (local key accounts)
 - **Networks** — 20 popular chains with pre-filled public RPCs; switch endpoint from a dropdown
 - **Dapp connect** — optional MetaMask drop-in (`window.ethereum`) for connecting to websites
 - **UI** — opens in the **side panel** by default; switch to popup in Settings
@@ -23,7 +25,7 @@ Load the unpacked extension from `dist/` in Chrome (Developer mode → Load unpa
 
 ## Security
 
-This is a **developer/testing wallet**, not a secure hardware-backed wallet. See [docs/wallet-security.md](docs/wallet-security.md) and [MetaMask comparison](docs/wallet-comparison-metamask.md).
+Local keys are for **developer/testing** use (password-encrypted vault in extension storage). Ledger/Trezor accounts keep private keys on the device. See [docs/wallet-security.md](docs/wallet-security.md) and [MetaMask comparison](docs/wallet-comparison-metamask.md).
 
 ## Wallet pain research tool
 
