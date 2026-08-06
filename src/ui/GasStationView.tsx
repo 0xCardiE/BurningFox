@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatUnits, getAddress } from 'viem';
-import { getWalletBalances } from '@lifi/sdk';
 import type { ExtendedChain, LiFiStep, Token } from '@lifi/types';
 import { getUnlockedAccount } from '../lib/accountSession';
 import { summarizeApiError } from '../lib/errors';
@@ -15,6 +14,7 @@ import { loadEvmMainnetChains } from '../lib/lifiBootstrap';
 import { executeLiFiStep, pollLiFiCrossChainStatus } from '../lib/lifiExecute';
 import { fmtNum, isNativeToken, parseHumanAmount } from '../lib/lifiHelpers';
 import { getNativeBalance } from '../lib/ethereum';
+import { loadWalletBalancesMap } from '../lib/walletBalances';
 import { sortEvmChainIds } from '../lib/chainPopularity';
 import {
   effectiveActiveChainId,
@@ -73,26 +73,19 @@ export function GasStationView({ settings }: { settings: AppSettings }) {
     if (!addr) return;
     setBalancesBusy(true);
     try {
-      const raw = await getWalletBalances(addr);
-      const out: Record<number, BalEntry[]> = {};
-      for (const [k, list] of Object.entries(raw ?? {})) {
-        const id = Number(k);
-        if (!Number.isFinite(id)) continue;
-        out[id] = (list as BalEntry[]).filter(t => {
-          try {
-            return BigInt(t.amount || '0') > 0n;
-          } catch {
-            return false;
-          }
-        });
-      }
-      setBalancesRecord(out);
+      const fallbackIds = [sourceChainId, destChainId].filter(
+        (id): id is number => id != null && Number.isFinite(id),
+      );
+      const { byChain } = await loadWalletBalancesMap(addr, {
+        rpcFallbackChainIds: fallbackIds.length ? fallbackIds : [defaultChainId],
+      });
+      setBalancesRecord(Object.keys(byChain).length ? byChain : null);
     } catch {
       setBalancesRecord(null);
     } finally {
       setBalancesBusy(false);
     }
-  }, [addr]);
+  }, [addr, defaultChainId, destChainId, sourceChainId]);
 
   useEffect(() => {
     let cancel = false;

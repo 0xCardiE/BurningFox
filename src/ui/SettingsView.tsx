@@ -1,6 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import { getAddress } from 'viem';
-import { getSessionPrivateKey, getUnlockedAccount } from '../lib/accountSession';
+import { useEffect, useState } from 'react';
 import {
   lockWallet,
   reopenWalletSurfaceAfterModeChange,
@@ -17,7 +15,6 @@ import {
   type ToolbarOpenMode,
 } from '../lib/storageState';
 import { describeError } from '../lib/utils';
-import { AccountsPanel } from './AccountsPanel';
 import { ScreenHeader } from './ScreenHeader';
 
 export function SettingsView({
@@ -25,11 +22,13 @@ export function SettingsView({
   onSaved,
   onBack,
   onOpenNetworks,
+  onOpenWallets,
 }: {
   settings: AppSettings;
   onSaved: () => void;
   onBack: () => void;
   onOpenNetworks?: () => void;
+  onOpenWallets?: () => void;
 }) {
   const [slippageStr, setSlippageStr] = useState(() =>
     String(effectiveSlippagePercent(settings)),
@@ -51,30 +50,6 @@ export function SettingsView({
   const [explorerApiKey, setExplorerApiKey] = useState(() => settings.explorerApiKey ?? '');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [copyFlash, setCopyFlash] = useState<'addr' | 'pk' | null>(null);
-  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const account = getUnlockedAccount();
-  const walletAddress = account ? getAddress(account.address) : null;
-  const walletPrivateKey = getSessionPrivateKey();
-
-  async function copyWalletField(kind: 'addr' | 'pk', text: string) {
-    try {
-      setErr(null);
-      await navigator.clipboard.writeText(text);
-      if (copyTimerRef.current) window.clearTimeout(copyTimerRef.current);
-      setCopyFlash(kind);
-      copyTimerRef.current = window.setTimeout(() => setCopyFlash(null), 2000);
-    } catch {
-      setErr('Could not copy — check extension clipboard permission.');
-    }
-  }
-
-  useEffect(() => {
-    return () => {
-      if (copyTimerRef.current) window.clearTimeout(copyTimerRef.current);
-    };
-  }, []);
 
   useEffect(() => {
     setSlippageStr(String(effectiveSlippagePercent(settings)));
@@ -150,87 +125,37 @@ export function SettingsView({
       <ScreenHeader title="Settings" onClose={onBack} />
       <div className="screen-body settings-panel">
         <div className="settings-body">
-          <div
-            style={{
-              marginBottom: 18,
-              padding: 10,
-              border: '1px solid var(--border)',
-              borderRadius: 8,
-            }}
-          >
-            <AccountsPanel onChanged={onSaved} />
-          </div>
-
-          {walletAddress ? (
-            <div
-              className="muted"
-              style={{
-                marginBottom: 18,
-                padding: 10,
-                border: '1px solid var(--border)',
-                borderRadius: 8,
-                fontSize: 12,
-                lineHeight: 1.45,
-              }}
-            >
-              <strong style={{ color: 'var(--text)' }}>Active wallet</strong>
-
-              <p style={{ margin: '10px 0 4px' }} className="mono">
-                {walletAddress}
-              </p>
-              <div className="row" style={{ marginBottom: 6 }}>
-                <p className="muted" style={{ fontSize: 11, margin: 0, flex: '1 1 auto' }}>
-                  Your address on EVM chains — use this to receive funds.
+          {onOpenNetworks ? (
+            <div className="l33t-settings-link-card">
+              <div>
+                <strong>Networks &amp; RPCs</strong>
+                <p className="muted" style={{ margin: '4px 0 0', fontSize: 12 }}>
+                  Add custom chains and manage RPC endpoints.
                 </p>
-                <button
-                  type="button"
-                  className="ghost"
-                  style={{ flex: '0 0 auto', padding: '6px 12px', fontSize: 12 }}
-                  onClick={() => void copyWalletField('addr', walletAddress)}
-                >
-                  {copyFlash === 'addr' ? 'Copied' : 'Copy'}
-                </button>
               </div>
-
-              {walletPrivateKey ? (
-                <>
-                  <label style={{ marginTop: 10, marginBottom: 4 }} htmlFor="wallet-privkey">
-                    Private key
-                  </label>
-                  <p
-                    id="wallet-privkey"
-                    className="mono"
-                    style={{
-                      margin: '4px 0 6px',
-                      fontSize: 12,
-                      letterSpacing: '0.08em',
-                      userSelect: 'none',
-                      WebkitUserSelect: 'none',
-                      opacity: 0.95,
-                    }}
-                    aria-label="Private key hidden"
-                  >
-                    ••••••••••••••••••••••••••••••••
-                  </p>
-                  <div className="row" style={{ marginBottom: 0 }}>
-                    <p className="muted" style={{ fontSize: 11, margin: 0, flex: '1 1 auto' }}>
-                      Hidden for safety — copy only when you need to back up or import elsewhere.
-                    </p>
-                    <button
-                      type="button"
-                      className="ghost"
-                      style={{ flex: '0 0 auto', padding: '6px 12px', fontSize: 12 }}
-                      onClick={() => void copyWalletField('pk', walletPrivateKey)}
-                    >
-                      {copyFlash === 'pk' ? 'Copied' : 'Copy'}
-                    </button>
-                  </div>
-                </>
-              ) : null}
+              <button type="button" className="ghost" onClick={onOpenNetworks}>
+                Open
+              </button>
             </div>
           ) : null}
 
-          <label htmlFor="slip">Slippage (%)</label>
+          {onOpenWallets ? (
+            <div className="l33t-settings-link-card">
+              <div>
+                <strong>Wallets</strong>
+                <p className="muted" style={{ margin: '4px 0 0', fontSize: 12 }}>
+                  Generate, import, connect hardware, and manage accounts.
+                </p>
+              </div>
+              <button type="button" className="ghost" onClick={onOpenWallets}>
+                Open
+              </button>
+            </div>
+          ) : null}
+
+          <label htmlFor="slip" style={{ marginTop: 16 }}>
+            Slippage (%)
+          </label>
           <input
             id="slip"
             type="number"
@@ -243,20 +168,6 @@ export function SettingsView({
           <p className="muted" style={{ fontSize: 12 }}>
             Sent to Li.FI as a ratio (example: 5% → 0.05). Used when requesting quotes.
           </p>
-
-          {onOpenNetworks ? (
-            <div className="l33t-settings-link-card">
-              <div>
-                <strong>Networks &amp; RPCs</strong>
-                <p className="muted" style={{ margin: '4px 0 0', fontSize: 12 }}>
-                  Add custom chains and manage RPC endpoints — kept separate from these settings.
-                </p>
-              </div>
-              <button type="button" className="ghost" onClick={onOpenNetworks}>
-                Open
-              </button>
-            </div>
-          ) : null}
 
           <label htmlFor="autolock" style={{ marginTop: 16 }}>
             Auto-lock after idle

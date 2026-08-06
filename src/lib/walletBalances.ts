@@ -1,6 +1,8 @@
 import { formatUnits } from 'viem';
 import { getAddress } from 'viem';
-import { getWalletBalances } from '@lifi/sdk';
+import { getTokens, getWalletBalances } from '@lifi/sdk';
+import { ChainType } from '@lifi/types';
+import { chainById } from './chainCatalog';
 import { snapshotHeldTokensOnChain, type OnChainBalanceProbe } from './ethereum';
 import { summarizeApiError } from './errors';
 
@@ -19,6 +21,8 @@ const NATIVE_ADDRS = new Set([
   '0x0000000000000000000000000000000000000000',
   '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
 ]);
+
+const ETH_PLACEHOLDER = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
 
 export function isNativeWalletToken(entry: WalletBalEntry): boolean {
   return NATIVE_ADDRS.has(entry.address.toLowerCase());
@@ -123,6 +127,109 @@ function compareByUsd(a: WalletBalEntry, b: WalletBalEntry): number {
   return a.symbol.localeCompare(b.symbol);
 }
 
+function parseLifiWalletBalances(raw: unknown): Record<number, WalletBalEntry[]> {
+  const out: Record<number, WalletBalEntry[]> = {};
+  for (const [k, list] of Object.entries((raw as Record<string, unknown>) ?? {})) {
+    const id = Number(k);
+    if (!Number.isFinite(id)) continue;
+    const rows: WalletBalEntry[] = [];
+    for (const t of list as WalletBalEntry[]) {
+      try {
+        if (BigInt(t.amount || '0') <= 0n) continue;
+      } catch {
+        continue;
+      }
+      rows.push({ ...t, chainId: id });
+    }
+    if (rows.length) out[id] = rows;
+  }
+  return out;
+}
+
+function nativeProbeForChain(chainId: number): OnChainBalanceProbe {
+  const chain = chainById(chainId);
+  return {
+    address: ETH_PLACEHOLDER,
+    decimals: chain?.nativeCurrency.decimals ?? 18,
+    symbol: chain?.nativeCurrency.symbol ?? 'ETH',
+    name: chain?.nativeCurrency.name ?? 'Ether',
+  };
+}
+
+/**
+ * Li.FI `/wallets/{address}/balances` can fail (424 / upstream 410). Fall back to
+ * Li.FI token catalog + on-chain RPC multicall for the active chain.
+ */
+export async function loadWalletBalancesRpcForChain(
+  holder: `0x${string}`,
+  chainId: number,
+): Promise<WalletBalEntry[]> {
+  const probes: OnChainBalanceProbe[] = [nativeProbeForChain(chainId)];
+  const seen = new Set<string>([ETH_PLACEHOLDER, '0x0000000000000000000000000000000000000000']);
+
+  try {
+    const res = await getTokens({
+      chains: [chainId],
+      chainTypes: [ChainType.EVM],
+      extended: true,
+      orderBy: 'volumeUSD24H',
+    });
+    for (const t of res.tokens?.[chainId] ?? []) {
+      const key = t.address.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      probes.push({
+        address: t.address,
+        decimals: t.decimals,
+        symbol: t.symbol,
+        name: t.name,
+        logoURI: t.logoURI,
+        priceUSD: t.priceUSD,
+      });
+      if (probes.length >= 80) break;
+    }
+  } catch {
+    /* native-only probe is enough to show gas balance */
+  }
+
+  const rows = await snapshotHeldTokensOnChain(chainId, holder, probes);
+  return rows.map(r => ({ ...r, chainId }));
+}
+
+/** Multi-chain Li.FI balances with optional per-chain RPC fallback. */
+export async function loadWalletBalancesMap(
+  address: string,
+  opts?: { rpcFallbackChainIds?: number[] },
+): Promise<{ byChain: Record<number, WalletBalEntry[]>; error: string | null }> {
+  const holder = getAddress(address);
+  try {
+    const raw = await getWalletBalances(holder);
+    return { byChain: parseLifiWalletBalances(raw), error: null };
+  } catch (e) {
+    const lifiError = summarizeApiError(e);
+    const chainIds = [...new Set((opts?.rpcFallbackChainIds ?? []).filter(Number.isFinite))];
+    if (chainIds.length === 0) {
+      return { byChain: {}, error: lifiError };
+    }
+
+    const byChain: Record<number, WalletBalEntry[]> = {};
+    let rpcFailed = false;
+    for (const chainId of chainIds) {
+      try {
+        const rows = await loadWalletBalancesRpcForChain(holder, chainId);
+        if (rows.length) byChain[chainId] = rows;
+      } catch {
+        rpcFailed = true;
+      }
+    }
+
+    if (Object.keys(byChain).length > 0) {
+      return { byChain, error: null };
+    }
+    return { byChain: {}, error: rpcFailed ? lifiError : null };
+  }
+}
+
 /** LiFi balances merged with optional on-chain RPC refresh for one chain. */
 export async function loadWalletBalancesForChain(
   address: string,
@@ -130,45 +237,41 @@ export async function loadWalletBalancesForChain(
   options?: { refreshRpc?: boolean },
 ): Promise<{ rows: WalletBalEntry[]; error: string | null }> {
   const holder = getAddress(address);
+  let chainRows: WalletBalEntry[] = [];
+  let lifiError: string | null = null;
+
   try {
     const raw = await getWalletBalances(holder);
-    const all: WalletBalEntry[] = [];
-    for (const [k, list] of Object.entries(raw ?? {})) {
-      const id = Number(k);
-      if (!Number.isFinite(id)) continue;
-      for (const t of list as WalletBalEntry[]) {
-        try {
-          if (BigInt(t.amount || '0') <= 0n) continue;
-        } catch {
-          continue;
-        }
-        all.push({ ...t, chainId: id });
-      }
-    }
-
-    let chainRows = all.filter(r => r.chainId === chainId);
-
-    const now = Date.now();
-    for (const [cid, pack] of [...rpcFresh.entries()]) {
-      if (now - pack.at >= RPC_BALANCE_OVERRIDE_TTL_MS) rpcFresh.delete(cid);
-    }
-
-    const cached = rpcFresh.get(chainId);
-    if (cached && now - cached.at < RPC_BALANCE_OVERRIDE_TTL_MS) {
-      chainRows = cached.rows;
-    } else if (options?.refreshRpc && chainRows.length > 0) {
-      const probes = chainRows.map(balEntryToProbe);
-      const fresh = await snapshotHeldTokensOnChain(chainId, holder, probes);
-      const rows = fresh.map(r => ({ ...r, chainId }));
-      rpcFresh.set(chainId, { at: now, rows });
-      chainRows = rows;
-    }
-
-    chainRows.sort(compareByUsd);
-    return { rows: chainRows, error: null };
+    const all = Object.values(parseLifiWalletBalances(raw)).flat();
+    chainRows = all.filter(r => r.chainId === chainId);
   } catch (e) {
-    return { rows: [], error: summarizeApiError(e) };
+    lifiError = summarizeApiError(e);
+    try {
+      chainRows = await loadWalletBalancesRpcForChain(holder, chainId);
+      lifiError = null;
+    } catch {
+      return { rows: [], error: lifiError };
+    }
   }
+
+  const now = Date.now();
+  for (const [cid, pack] of [...rpcFresh.entries()]) {
+    if (now - pack.at >= RPC_BALANCE_OVERRIDE_TTL_MS) rpcFresh.delete(cid);
+  }
+
+  const cached = rpcFresh.get(chainId);
+  if (cached && now - cached.at < RPC_BALANCE_OVERRIDE_TTL_MS) {
+    chainRows = cached.rows;
+  } else if (options?.refreshRpc && chainRows.length > 0) {
+    const probes = chainRows.map(balEntryToProbe);
+    const fresh = await snapshotHeldTokensOnChain(chainId, holder, probes);
+    const rows = fresh.map(r => ({ ...r, chainId }));
+    rpcFresh.set(chainId, { at: now, rows });
+    chainRows = rows;
+  }
+
+  chainRows.sort(compareByUsd);
+  return { rows: chainRows, error: null };
 }
 
 export function invalidateRpcBalanceCache(chainId?: number): void {

@@ -9,6 +9,7 @@ import {
 import { Onboarding } from './ui/Onboarding';
 import { Unlock } from './ui/Unlock';
 import { SettingsView } from './ui/SettingsView';
+import { WalletsView } from './ui/WalletsView';
 import { NetworksManageView } from './ui/NetworksManageView';
 import { WalletLayout, type WalletMainTab } from './ui/WalletLayout';
 import { WalletHomeView } from './ui/WalletHomeView';
@@ -19,7 +20,7 @@ import { ScreenFade } from './ui/ScreenFade';
 
 type Screen = 'load' | 'onboard' | 'main';
 type MainTab = WalletMainTab;
-type Overlay = 'none' | 'settings' | 'networks';
+type Overlay = 'none' | 'settings' | 'networks' | 'wallets';
 
 export function App() {
   const [screen, setScreen] = useState<Screen>('load');
@@ -90,6 +91,8 @@ export function App() {
           ? 'unlock'
           : overlay === 'settings'
             ? 'settings'
+            : overlay === 'wallets'
+              ? 'wallets'
             : overlay === 'networks'
               ? 'networks'
               : mainTab;
@@ -115,6 +118,13 @@ export function App() {
         }}
       />
     );
+  } else if (overlay === 'wallets') {
+    shell = (
+      <WalletsView
+        onChanged={() => void refresh()}
+        onBack={() => setOverlay('settings')}
+      />
+    );
   } else if (overlay === 'settings') {
     shell = (
       <SettingsView
@@ -122,6 +132,7 @@ export function App() {
         onSaved={() => void refresh()}
         onBack={() => setOverlay('none')}
         onOpenNetworks={() => setOverlay('networks')}
+        onOpenWallets={() => setOverlay('wallets')}
       />
     );
   } else if (overlay === 'networks') {

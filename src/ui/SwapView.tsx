@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatUnits, getAddress, parseUnits } from 'viem';
-import { getQuote, getStatus, getTokens, getWalletBalances } from '@lifi/sdk';
+import { getQuote, getStatus, getTokens } from '@lifi/sdk';
 import { ChainType, CoinKey, TokenTag } from '@lifi/types';
 import type { ExtendedChain, LiFiStep, Token, TokenExtended } from '@lifi/types';
 import { getUnlockedAccount } from '../lib/accountSession';
@@ -20,6 +20,7 @@ import type { OnChainBalanceProbe } from '../lib/ethereum';
 import { transactionExplorerUrl } from '../lib/explorerUrls';
 import { appendSwapToHistory, loadSwapHistory, type SwapHistoryEntry } from '../lib/swapHistory';
 import { loadSwapUi, saveSwapUi } from '../lib/swapUiPersist';
+import { loadWalletBalancesMap } from '../lib/walletBalances';
 import { describeRevertedTx } from '../lib/txFailureDetail';
 import { ScreenHeader } from './ScreenHeader';
 import { LeetLiFiIcon } from './LeetLiFiIcon';
@@ -395,40 +396,33 @@ export function SwapView({
     setBalancesBusy(true);
     setBalancesErr(null);
     try {
-      const raw = await getWalletBalances(addr);
-      const out: Record<number, BalEntry[]> = {};
-      for (const [k, list] of Object.entries(raw ?? {})) {
-        const id = Number(k);
-        if (!Number.isFinite(id)) continue;
-        out[id] = (list as BalEntry[]).filter(t => {
-          try {
-            const a = BigInt(t.amount || '0');
-            return a > 0n;
-          } catch {
-            return false;
-          }
-        });
-      }
+      const fallbackIds = [fromChainId, toChainId].filter(
+        (id): id is number => id != null && Number.isFinite(id),
+      );
+      const { byChain, error } = await loadWalletBalancesMap(addr, {
+        rpcFallbackChainIds: fallbackIds,
+      });
       const now = Date.now();
       for (const [cid, pack] of [...rpcFreshRef.current.entries()]) {
         if (now - pack.at >= RPC_BALANCE_OVERRIDE_TTL_MS) {
           rpcFreshRef.current.delete(cid);
         }
       }
-      const merged: Record<number, BalEntry[]> = { ...out };
+      const merged: Record<number, BalEntry[]> = { ...byChain };
       for (const [cid, pack] of rpcFreshRef.current.entries()) {
         if (now - pack.at < RPC_BALANCE_OVERRIDE_TTL_MS) {
           merged[cid] = pack.rows;
         }
       }
-      setBalancesRecord(merged);
+      setBalancesRecord(Object.keys(merged).length ? merged : null);
+      setBalancesErr(error);
     } catch (e) {
       setBalancesRecord(null);
       setBalancesErr(summarizeApiError(e));
     } finally {
       setBalancesBusy(false);
     }
-  }, [addr]);
+  }, [addr, fromChainId, toChainId]);
 
   useEffect(() => {
     balancesRecordRef.current = balancesRecord;
