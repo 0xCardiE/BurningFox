@@ -71,7 +71,7 @@ function SendProgressPanel({ progress }: { progress: SendProgress }) {
       </div>
       <div className="l33t-quick-send-inline__progress-meta mono">
         {progress.headBlock != null ? (
-          <span title="Chain head at broadcast">head #{progress.headBlock.toLocaleString()}</span>
+          <span title="Chain block when transaction was sent">Sent #{progress.headBlock.toLocaleString()}</span>
         ) : null}
         {progress.nonce != null ? <span title="Account nonce">nonce {progress.nonce}</span> : null}
         {progress.gasLimit != null ? (
@@ -81,10 +81,10 @@ function SendProgressPanel({ progress }: { progress: SendProgress }) {
           <span title={progress.txHash}>tx {shortHash(progress.txHash)}</span>
         ) : null}
         {progress.phase === 'pending' && progress.tipBlock != null ? (
-          <span title="Latest block while waiting">tip #{progress.tipBlock.toLocaleString()}</span>
+          <span title="Latest chain block while waiting">Current #{progress.tipBlock.toLocaleString()}</span>
         ) : null}
         {progress.phase === 'pending' && estBlocks != null && estBlocks > 0 ? (
-          <span title="Blocks since broadcast">+{estBlocks} blk</span>
+          <span title="Blocks mined since send">+{estBlocks} blk</span>
         ) : null}
       </div>
     </div>
