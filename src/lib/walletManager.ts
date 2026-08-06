@@ -70,6 +70,66 @@ async function persistLocalVault(
   await saveAccountsState({ vault, accounts, activeAccountId });
 }
 
+/** Align vault key map with account metadata (id mismatches, HD re-derive). */
+function reconcileVaultKeys(
+  keys: Record<string, `0x${string}`>,
+  accounts: WalletAccount[],
+  mnemonic?: string,
+): Record<string, `0x${string}`> {
+  const out = { ...keys };
+  const byAddress = new Map<string, `0x${string}`>();
+  for (const pk of Object.values(out)) {
+    try {
+      byAddress.set(normalizeAddress(privateKeyToAccount(pk).address), pk);
+    } catch {
+      /* skip malformed */
+    }
+  }
+
+  for (const account of accounts) {
+    if (account.kind !== 'local' || out[account.id]) continue;
+
+    const byAddr = byAddress.get(account.address);
+    if (byAddr) {
+      out[account.id] = byAddr;
+      continue;
+    }
+
+    if (mnemonic && account.derivationPath) {
+      const match = account.derivationPath.match(/^m\/44'\/60'\/0'\/0\/(\d+)$/);
+      if (match) {
+        out[account.id] = privateKeyFromMnemonic(mnemonic, Number(match[1]));
+      }
+    }
+  }
+  return out;
+}
+
+function resolveUnlockableActiveId(
+  accounts: WalletAccount[],
+  preferredId: string | undefined,
+  keys: Record<string, `0x${string}`>,
+): string {
+  const preferred = accounts.find(a => a.id === preferredId);
+  if (preferred?.kind === 'local') {
+    if (keys[preferred.id]) return preferred.id;
+  } else if (preferred) {
+    return preferred.id;
+  }
+
+  const firstLocal = accounts.find(a => a.kind === 'local' && keys[a.id]);
+  if (firstLocal) return firstLocal.id;
+
+  const firstAny = accounts[0];
+  if (!firstAny) throw new Error('No accounts in vault.');
+  if (firstAny.kind === 'local' && !keys[firstAny.id]) {
+    throw new Error(
+      'Local key missing for this account. Switch back to an account you fully unlocked, or restore from backup.',
+    );
+  }
+  return firstAny.id;
+}
+
 /** Unlock vault, migrate v1→v2 if needed, hydrate session. */
 export async function unlockWallet(password: string): Promise<void> {
   const state = await loadPersisted();
@@ -107,7 +167,15 @@ export async function unlockWallet(password: string): Promise<void> {
 
   setSessionPassword(password);
   setSessionMnemonic(secrets.mnemonic ?? null);
+  keys = reconcileVaultKeys(keys, accounts, secrets.mnemonic);
   setLocalKeys(keys);
+
+  const resolvedActiveId = resolveUnlockableActiveId(accounts, activeAccountId, keys);
+  if (resolvedActiveId !== activeAccountId) {
+    activeAccountId = resolvedActiveId;
+    await saveAccountsState({ accounts, activeAccountId });
+  }
+
   setAccountsMeta(accounts, activeAccountId);
   const active = activateAccount(activeAccountId ?? accounts[0]!.id);
   if (active.kind === 'local') {
@@ -377,17 +445,39 @@ export async function addHardwareAccount(opts: {
 }
 
 export async function switchActiveAccount(accountId: string): Promise<WalletAccount> {
-  await persistActiveAccountId(accountId);
-  const meta = activateAccount(accountId);
-  setAccountsMeta(getAccountsMeta(), accountId);
-  if (meta.kind === 'local') {
-    const pk = getLocalKeys().get(meta.id);
-    if (!pk) throw new Error('Local key missing — unlock again.');
-    await persistSessionPrivateKey(pk);
-  } else {
-    await persistHardwareSession(meta);
+  const previousId = getActiveAccountId();
+  const meta = getAccountsMeta().find(a => a.id === accountId);
+  if (!meta) throw new Error('Account not found.');
+  if (meta.kind === 'local' && !getLocalKeys().get(accountId)) {
+    throw new Error(
+      'This account needs a full unlock first. Lock the wallet, enter your password, then switch.',
+    );
   }
-  return meta;
+
+  try {
+    await persistActiveAccountId(accountId);
+    const activated = activateAccount(accountId);
+    setAccountsMeta(getAccountsMeta(), accountId);
+    if (activated.kind === 'local') {
+      const pk = getLocalKeys().get(activated.id);
+      if (!pk) throw new Error('Local key missing — unlock again.');
+      await persistSessionPrivateKey(pk);
+    } else {
+      await persistHardwareSession(activated);
+    }
+    return activated;
+  } catch (e) {
+    if (previousId && previousId !== accountId) {
+      try {
+        await persistActiveAccountId(previousId);
+        activateAccount(previousId);
+        setAccountsMeta(getAccountsMeta(), previousId);
+      } catch {
+        /* best-effort rollback */
+      }
+    }
+    throw e;
+  }
 }
 
 export async function removeAccount(accountId: string): Promise<void> {

@@ -73,8 +73,12 @@ export async function hydrateAccountFromBackground(): Promise<boolean> {
     );
     if (match) {
       setLocalKeys({ [match.id]: hex });
-      setAccountsMeta(persisted.accounts, match.id);
-      activateAccount(match.id);
+      setAccountsMeta(persisted.accounts, persisted.activeAccountId);
+      try {
+        activateAccount(persisted.activeAccountId ?? match.id);
+      } catch {
+        activateAccount(match.id);
+      }
     } else {
       setUnlockedAccount(account, hex);
     }
