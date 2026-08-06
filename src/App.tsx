@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { loadPersisted, WALLET_PERSIST_KEY, type AppSettings } from './lib/storageState';
+import { loadPersisted, WALLET_PERSIST_KEY, type AppSettings, effectiveToolbarOpenMode } from './lib/storageState';
 import { isUnlocked } from './lib/accountSession';
 import {
   hydrateAccountFromBackground,
@@ -62,6 +62,13 @@ export function App() {
     chrome.storage.onChanged.addListener(onChanged);
     return () => chrome.storage.onChanged.removeListener(onChanged);
   }, [screen, refresh]);
+
+  useEffect(() => {
+    const mode = effectiveToolbarOpenMode(settings);
+    const root = document.documentElement;
+    root.classList.toggle('l33t-surface--popup', mode === 'popup');
+    root.classList.toggle('l33t-surface--side-panel', mode === 'side_panel');
+  }, [settings]);
 
   useEffect(() => {
     if (screen !== 'main') return;

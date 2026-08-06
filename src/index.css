@@ -2894,6 +2894,37 @@ button.l33t-dapp-bar__btn--disconnect:hover:not(:disabled) {
   height: 100%;
 }
 
+/* Popup toolbar: one scroll region for header, network, and tab body; dock stays pinned */
+html.l33t-surface--popup #root,
+html.l33t-surface--popup .leet-route-root,
+html.l33t-surface--popup .leet-route-layer {
+  height: var(--popup-min-height);
+  max-height: var(--popup-min-height);
+  min-height: 0;
+  overflow: hidden;
+}
+
+html.l33t-surface--popup .wallet-shell.l33t--main {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  max-height: var(--popup-min-height);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+html.l33t-surface--popup .l33t-body--main {
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+html.l33t-surface--popup .l33t-main-header,
+html.l33t-surface--popup .l33t-mm-tabs,
+html.l33t-surface--popup .l33t-layout-network {
+  flex-shrink: 0;
+}
+
 /* Pending dapp approval sheet */
 .l33t-tx-approval__panel {
   max-height: 92%;
