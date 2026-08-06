@@ -1,4 +1,4 @@
-import { L33tMark } from './L33tMark';
+import { L33tBrand } from './L33tBrand';
 
 export function LoadingScreen({ message }: { message?: string }) {
   return (
@@ -8,8 +8,7 @@ export function LoadingScreen({ message }: { message?: string }) {
       aria-live="polite"
       aria-busy="true"
     >
-      <L33tMark className="loading-screen-logo" size={72} />
-      <p className="loading-screen-brand">1337</p>
+      <L33tBrand className="loading-screen-brand-stack" skullSize={80} wordmarkWidth={180} />
       {message ? (
         <p className="loading-screen-message">{message}</p>
       ) : (
