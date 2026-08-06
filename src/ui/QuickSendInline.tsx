@@ -179,45 +179,49 @@ export function QuickSendInline({
 
   return (
     <div className="l33t-quick-send-inline">
-      <input
-        className="l33t-quick-send-inline__addr"
-        value={addrDisplay}
-        onChange={e => setToRaw(e.target.value)}
-        onFocus={() => setAddrFocused(true)}
-        onBlur={() => setAddrFocused(false)}
-        placeholder="0x…"
-        spellCheck={false}
-        autoComplete="off"
-        autoFocus
-        disabled={busy}
-        title={toValid ? getAddress(toRaw.trim()) : undefined}
-      />
-      <input
-        className="l33t-quick-send-inline__amt"
-        value={amountStr}
-        onChange={e => setAmountStr(e.target.value)}
-        placeholder="0.0"
-        inputMode="decimal"
-        autoComplete="off"
-        disabled={busy}
-      />
-      <button
-        type="button"
-        className="l33t-quick-send-inline__max"
-        onClick={useMax}
-        disabled={busy}
-        title="Use max balance"
-      >
-        Max
-      </button>
-      <button
-        type="button"
-        className="l33t-quick-send-inline__send primary"
-        disabled={!canSend}
-        onClick={() => void submit()}
-      >
-        {busy ? '…' : 'Send'}
-      </button>
+      <div className="l33t-quick-send-inline__row">
+        <input
+          className="l33t-quick-send-inline__addr"
+          value={addrDisplay}
+          onChange={e => setToRaw(e.target.value)}
+          onFocus={() => setAddrFocused(true)}
+          onBlur={() => setAddrFocused(false)}
+          placeholder="Recipient 0x…"
+          spellCheck={false}
+          autoComplete="off"
+          autoFocus
+          disabled={busy}
+          title={toValid ? getAddress(toRaw.trim()) : undefined}
+        />
+        <input
+          className="l33t-quick-send-inline__amt"
+          value={amountStr}
+          onChange={e => setAmountStr(e.target.value)}
+          placeholder="0.0"
+          inputMode="decimal"
+          autoComplete="off"
+          disabled={busy}
+        />
+        <div className="l33t-quick-send-inline__actions">
+          <button
+            type="button"
+            className="l33t-quick-send-inline__max"
+            onClick={useMax}
+            disabled={busy}
+            title="Use max balance"
+          >
+            Max
+          </button>
+          <button
+            type="button"
+            className="l33t-quick-send-inline__send primary"
+            disabled={!canSend}
+            onClick={() => void submit()}
+          >
+            {busy ? '…' : 'Send'}
+          </button>
+        </div>
+      </div>
       {fieldErr ? <p className="error l33t-quick-send-inline__err">{fieldErr}</p> : null}
     </div>
   );

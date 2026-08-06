@@ -106,6 +106,9 @@ export function WalletHomeView({
                     {fmtTokenAmount(t)} {t.symbol}
                   </span>
                 </div>
+                <span className="l33t-token-row__toggle" aria-hidden>
+                  {open ? '−' : '+'}
+                </span>
               </button>
               {open ? (
                 <QuickSendInline

@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { getUnlockedAccount } from '../lib/accountSession';
 import type { AppSettings } from '../lib/storageState';
 import { AccountSwitcher } from './AccountSwitcher';
+import { L33tMark } from './L33tMark';
 import { NetworkSelector } from './NetworkSelector';
 import { DappConnectionBar } from './DappConnectionBar';
 import { TxApprovalSheet } from './TxApprovalSheet';
@@ -57,13 +58,10 @@ export function WalletLayout({
   return (
     <div className="wallet-shell l33t l33t--main">
       <header className="screen-header l33t-main-header">
-        {account ? (
-          <AccountSwitcher onChanged={onSaved} />
-        ) : (
-          <span className="l33t-main-header__addr l33t-main-header__addr--empty muted">
-            Locked
-          </span>
-        )}
+        <div className="l33t-main-header__brand">
+          <L33tMark size={22} animated={false} />
+          <span className="l33t-main-header__title">1337</span>
+        </div>
         <div className="screen-header-right">{settingsBtn}</div>
       </header>
 
@@ -88,7 +86,10 @@ export function WalletLayout({
       <div className="screen-body l33t-body l33t-body--main">{children}</div>
 
       <DevErrorPanel />
-      <DappConnectionBar settings={settings} onSaved={onSaved} />
+      <footer className="l33t-wallet-dock" aria-label="Wallet status">
+        {account ? <AccountSwitcher onChanged={onSaved} /> : null}
+        <DappConnectionBar settings={settings} onSaved={onSaved} embedded />
+      </footer>
       <TxApprovalSheet settings={settings} />
       <NetworkDoctorSheet settings={settings} onSaved={onSaved} />
     </div>

@@ -37,7 +37,11 @@ import {
   parseImportPrivateKey,
   privateKeyFromMnemonic,
 } from './walletCore';
-import { persistSessionPrivateKey, clearSessionInBackground } from './sessionBridge';
+import {
+  persistSessionPrivateKey,
+  persistUnlockPassword,
+  clearSessionInBackground,
+} from './sessionBridge';
 
 function normalizeAddress(address: string): `0x${string}` {
   return getAddress(address).toLowerCase() as `0x${string}`;
@@ -130,6 +134,54 @@ function resolveUnlockableActiveId(
   return firstAny.id;
 }
 
+async function loadAllLocalKeysFromVault(
+  password: string,
+): Promise<Record<string, `0x${string}`>> {
+  const state = await loadPersisted();
+  if (!state.vault) throw new Error('No vault found.');
+  const secrets = await decryptVaultSecrets(state.vault, password);
+  const keys = reconcileVaultKeys(secrets.keys, state.accounts, secrets.mnemonic);
+  setSessionPassword(password);
+  setSessionMnemonic(secrets.mnemonic ?? null);
+  setLocalKeys(keys);
+  setAccountsMeta(state.accounts, state.activeAccountId);
+  return keys;
+}
+
+async function ensureLocalKeyForAccount(accountId: string): Promise<`0x${string}`> {
+  const cached = getLocalKeys().get(accountId);
+  if (cached) return cached;
+
+  const meta = getAccountsMeta().find(a => a.id === accountId);
+  if (!meta) throw new Error('Account not found.');
+  if (meta.kind !== 'local') throw new Error('Not a local account.');
+
+  const password = getSessionPassword();
+  if (password) {
+    const keys = await loadAllLocalKeysFromVault(password);
+    const pk = keys[accountId];
+    if (pk) return pk;
+  }
+
+  const mnemonic = getSessionMnemonic();
+  if (mnemonic && meta.derivationPath) {
+    const match = meta.derivationPath.match(/^m\/44'\/60'\/0'\/0\/(\d+)$/);
+    if (match) {
+      const pk = privateKeyFromMnemonic(mnemonic, Number(match[1]));
+      const merged = Object.fromEntries(getLocalKeys());
+      merged[accountId] = pk;
+      setLocalKeys(merged);
+      return pk;
+    }
+  }
+
+  throw new Error('Local key missing — unlock again.');
+}
+
+export async function hydrateLocalKeysFromVault(password: string): Promise<void> {
+  await loadAllLocalKeysFromVault(password);
+}
+
 /** Unlock vault, migrate v1→v2 if needed, hydrate session. */
 export async function unlockWallet(password: string): Promise<void> {
   const state = await loadPersisted();
@@ -180,7 +232,10 @@ export async function unlockWallet(password: string): Promise<void> {
   const active = activateAccount(activeAccountId ?? accounts[0]!.id);
   if (active.kind === 'local') {
     const pk = getLocalKeys().get(active.id);
-    if (pk) await persistSessionPrivateKey(pk);
+    if (pk) {
+      await persistSessionPrivateKey(pk, password);
+      await persistUnlockPassword(password);
+    }
   } else {
     await persistHardwareSession(active);
   }
@@ -448,20 +503,20 @@ export async function switchActiveAccount(accountId: string): Promise<WalletAcco
   const previousId = getActiveAccountId();
   const meta = getAccountsMeta().find(a => a.id === accountId);
   if (!meta) throw new Error('Account not found.');
-  if (meta.kind === 'local' && !getLocalKeys().get(accountId)) {
-    throw new Error(
-      'This account needs a full unlock first. Lock the wallet, enter your password, then switch.',
-    );
-  }
 
   try {
+    if (meta.kind === 'local') {
+      await ensureLocalKeyForAccount(accountId);
+    }
     await persistActiveAccountId(accountId);
     const activated = activateAccount(accountId);
     setAccountsMeta(getAccountsMeta(), accountId);
     if (activated.kind === 'local') {
       const pk = getLocalKeys().get(activated.id);
       if (!pk) throw new Error('Local key missing — unlock again.');
-      await persistSessionPrivateKey(pk);
+      const pwd = getSessionPassword();
+      await persistSessionPrivateKey(pk, pwd ?? undefined);
+      if (pwd) await persistUnlockPassword(pwd);
     } else {
       await persistHardwareSession(activated);
     }

@@ -106,6 +106,7 @@ void syncToolbarOpenModeFromSettings();
 void loadPersistedSettingsOnStart();
 
 const SESSION_KEY = 'l33t_session_pk';
+const UNLOCK_PASSWORD_KEY = 'l33t_session_unlock';
 /** Legacy session keys — read once then cleared after unlock. */
 const LEGACY_SESSION_KEYS = [
   'burn_box_session_pk',
@@ -122,6 +123,7 @@ const LEGACY_ACTIVITY_KEYS = [
 ] as const;
 
 let memoryPk: string | null = null;
+let memoryUnlockPassword: string | null = null;
 type HwSession = {
   kind: 'ledger' | 'trezor';
   accountId: string;
@@ -259,6 +261,7 @@ type Msg =
   | {
       type: 'SET_SESSION';
       privateKeyHex?: string;
+      unlockPassword?: string;
       session?: HwSession;
     }
   | { type: 'CLEAR_SESSION' }
@@ -285,6 +288,18 @@ type Msg =
   | { type: 'DISCONNECT_ACTIVE_TAB' }
   | { type: 'GET_PENDING_APPROVALS' }
   | { type: 'RESOLVE_PENDING_APPROVAL'; id: string; approved: boolean; gasOverrides?: import('./lib/gasOverrides').GasOverrideInput };
+
+async function sessionUnlockPassword(): Promise<string | null> {
+  await maybeAutoLockExpired();
+  if (memoryUnlockPassword) return memoryUnlockPassword;
+  const data = await chrome.storage.session.get([UNLOCK_PASSWORD_KEY]);
+  const pwd = data[UNLOCK_PASSWORD_KEY];
+  if (typeof pwd === 'string' && pwd.length > 0) {
+    memoryUnlockPassword = pwd;
+    return pwd;
+  }
+  return null;
+}
 
 async function sessionPrivateKey(): Promise<`0x${string}` | null> {
   await maybeAutoLockExpired();
@@ -362,8 +377,10 @@ async function maybeAutoLockExpired(): Promise<void> {
     if (Date.now() - last > mins * 60 * 1000) {
       memoryPk = null;
       memoryHw = null;
+      memoryUnlockPassword = null;
       await chrome.storage.session.remove([
         SESSION_KEY,
+        UNLOCK_PASSWORD_KEY,
         HW_SESSION_KEY,
         ...LEGACY_SESSION_KEYS,
         ACTIVITY_KEY,
@@ -665,13 +682,14 @@ chrome.runtime.onMessage.addListener(
       void (async () => {
         try {
           const pk = await sessionPrivateKey();
+          const unlockPassword = await sessionUnlockPassword();
           if (pk) {
-            sendResponse({ ok: true, privateKeyHex: pk });
+            sendResponse({ ok: true, privateKeyHex: pk, unlockPassword: unlockPassword ?? undefined });
             return;
           }
           const hw = await sessionHardware();
           if (hw) {
-            sendResponse({ ok: true, session: hw });
+            sendResponse({ ok: true, session: hw, unlockPassword: unlockPassword ?? undefined });
             return;
           }
           sendResponse({ ok: false });
@@ -690,6 +708,10 @@ chrome.runtime.onMessage.addListener(
         }
         memoryPk = message.privateKeyHex;
         memoryHw = null;
+        if (typeof message.unlockPassword === 'string' && message.unlockPassword.length > 0) {
+          memoryUnlockPassword = message.unlockPassword;
+          void chrome.storage.session.set({ [UNLOCK_PASSWORD_KEY]: memoryUnlockPassword });
+        }
         void chrome.storage.session.set({ [SESSION_KEY]: memoryPk });
         void chrome.storage.session.remove([
           ...LEGACY_SESSION_KEYS,
@@ -713,6 +735,13 @@ chrome.runtime.onMessage.addListener(
         sendResponse({ ok: true });
         return;
       }
+      if (typeof message.unlockPassword === 'string' && message.unlockPassword.length > 0) {
+        memoryUnlockPassword = message.unlockPassword;
+        void chrome.storage.session.set({ [UNLOCK_PASSWORD_KEY]: memoryUnlockPassword });
+        void touchActivity();
+        sendResponse({ ok: true });
+        return;
+      }
       sendResponse({ ok: false, error: 'invalid session' });
       return;
     }
@@ -720,8 +749,10 @@ chrome.runtime.onMessage.addListener(
     if (message.type === 'CLEAR_SESSION') {
       memoryPk = null;
       memoryHw = null;
+      memoryUnlockPassword = null;
       void chrome.storage.session.remove([
         SESSION_KEY,
+        UNLOCK_PASSWORD_KEY,
         HW_SESSION_KEY,
         ...LEGACY_SESSION_KEYS,
         ACTIVITY_KEY,

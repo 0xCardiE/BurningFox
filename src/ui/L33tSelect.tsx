@@ -82,6 +82,7 @@ export function L33tSelect({
 }) {
   const open = openMenu === id;
   const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -103,10 +104,22 @@ export function L33tSelect({
 
   useEffect(() => {
     if (!open) return;
-    const close = () => setOpenMenu(null);
-    window.addEventListener('scroll', close, true);
-    return () => window.removeEventListener('scroll', close, true);
-  }, [open, setOpenMenu]);
+    const panel = panelRef.current;
+    if (!panel) return;
+
+    const onWheel = (e: WheelEvent) => {
+      if (panel.scrollHeight <= panel.clientHeight) return;
+      const atTop = panel.scrollTop <= 0;
+      const atBottom = panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 1;
+      if ((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom)) {
+        e.preventDefault();
+      }
+      e.stopPropagation();
+    };
+
+    panel.addEventListener('wheel', onWheel, { passive: false });
+    return () => panel.removeEventListener('wheel', onWheel);
+  }, [open]);
 
   return (
     <div
@@ -140,6 +153,7 @@ export function L33tSelect({
       </button>
       {open ? (
         <div
+          ref={panelRef}
           className="l33t-dd__panel"
           role="listbox"
           aria-label={label}

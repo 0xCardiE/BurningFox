@@ -3,6 +3,7 @@ import {
   clearAccountSession,
   setAccountsMeta,
   setLocalKeys,
+  setSessionPassword,
   setUnlockedAccount,
 } from './accountSession';
 import type { AccountKind } from './accounts';
@@ -17,10 +18,16 @@ export type HardwareSession = {
 };
 
 type SessionResponse =
-  | { ok: true; privateKeyHex: string; session?: undefined }
+  | {
+      ok: true;
+      privateKeyHex: string;
+      unlockPassword?: string;
+      session?: undefined;
+    }
   | {
       ok: true;
       privateKeyHex?: undefined;
+      unlockPassword?: string;
       session: HardwareSession;
     }
   | { ok: false; error?: string };
@@ -51,9 +58,17 @@ export async function hydrateAccountFromBackground(): Promise<boolean> {
     const persisted = await loadPersisted();
     setAccountsMeta(persisted.accounts, persisted.activeAccountId);
 
+    if (res.unlockPassword) {
+      setSessionPassword(res.unlockPassword);
+      try {
+        const { hydrateLocalKeysFromVault } = await import('./walletManager');
+        await hydrateLocalKeysFromVault(res.unlockPassword);
+      } catch {
+        /* fall through to single-key hydrate */
+      }
+    }
+
     if (res.session && (res.session.kind === 'ledger' || res.session.kind === 'trezor')) {
-      // Hardware session — no local keys in background; user must unlock again for local keys.
-      // If accounts meta has this hardware account, activate it for address-only UI.
       const id = res.session.accountId;
       if (persisted.accounts.some(a => a.id === id)) {
         activateAccount(id);
@@ -66,13 +81,14 @@ export async function hydrateAccountFromBackground(): Promise<boolean> {
       return false;
     }
     const hex = res.privateKeyHex as `0x${string}`;
-    // Without password we can't rebuild the full local key map; hydrate single active key.
     const account = accountFromPrivateKey(hex);
     const match = persisted.accounts.find(
       a => a.kind === 'local' && a.address.toLowerCase() === account.address.toLowerCase(),
     );
     if (match) {
-      setLocalKeys({ [match.id]: hex });
+      if (!res.unlockPassword) {
+        setLocalKeys({ [match.id]: hex });
+      }
       setAccountsMeta(persisted.accounts, persisted.activeAccountId);
       try {
         activateAccount(persisted.activeAccountId ?? match.id);
@@ -88,8 +104,22 @@ export async function hydrateAccountFromBackground(): Promise<boolean> {
   }
 }
 
-export async function persistSessionPrivateKey(pk: `0x${string}`): Promise<void> {
-  await sendMessage({ type: 'SET_SESSION', privateKeyHex: pk });
+export async function persistSessionPrivateKey(
+  pk: `0x${string}`,
+  unlockPassword?: string,
+): Promise<void> {
+  await sendMessage({
+    type: 'SET_SESSION',
+    privateKeyHex: pk,
+    unlockPassword,
+  });
+}
+
+export async function persistUnlockPassword(password: string): Promise<void> {
+  await sendMessage({
+    type: 'SET_SESSION',
+    unlockPassword: password,
+  });
 }
 
 /** Set local account and persist so reopening the popup stays unlocked. */

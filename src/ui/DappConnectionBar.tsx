@@ -27,9 +27,12 @@ function SiteIcon({ favIconUrl, label, connected }: { favIconUrl?: string; label
 export function DappConnectionBar({
   settings,
   onSaved,
+  embedded = false,
 }: {
   settings: AppSettings;
   onSaved: () => void;
+  /** When true, omit outer footer chrome (used inside l33t-wallet-dock). */
+  embedded?: boolean;
 }) {
   const [status, setStatus] = useState<DappConnectionStatus | null>(null);
   const [busy, setBusy] = useState(false);
@@ -86,7 +89,7 @@ export function DappConnectionBar({
   const canConnect = status?.canConnect === true;
 
   return (
-    <footer className="l33t-dapp-bar" aria-label="Website connection">
+    <div className={`l33t-dapp-bar${embedded ? ' l33t-dapp-bar--embedded' : ''}`} aria-label="Website connection">
       <div className="l33t-dapp-bar__site">
         {connected && tab ? (
           <>
@@ -151,6 +154,6 @@ export function DappConnectionBar({
       </div>
 
       {err ? <p className="error l33t-dapp-bar__err">{err}</p> : null}
-    </footer>
+    </div>
   );
 }

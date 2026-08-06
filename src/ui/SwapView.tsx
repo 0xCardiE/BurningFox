@@ -354,6 +354,8 @@ export function SwapView({
   const [sourceTokensErr, setSourceTokensErr] = useState<string | null>(null);
 
   const [amountStr, setAmountStr] = useState('');
+  /** Alternates the quick-fill button between MAX and Half. */
+  const [amountQuickToggle, setAmountQuickToggle] = useState<'max' | 'half'>('max');
   const [quote, setQuote] = useState<LiFiStep | null>(null);
   const [quoteErr, setQuoteErr] = useState<string | null>(null);
   const [quoteBusy, setQuoteBusy] = useState(false);
@@ -935,30 +937,37 @@ export function SwapView({
   const fromChainMeta = fromChainId != null ? chainMeta.get(fromChainId) : undefined;
   const toChainMeta = toChainId != null ? chainMeta.get(toChainId) : undefined;
 
-  const maxAmount = () => {
-    if (!fromToken) return;
-    setSwapSuccessCta(false);
-    if (!execBusy) clearSwapStatusBanner();
-    try {
-      const v = formatUnits(BigInt(fromToken.amount), fromToken.decimals);
-      setAmountStr(v);
-    } catch {
-      setExecLog('Could not read balance for this token from LiFi.');
-    }
-  };
-
-  const applyAmountPercent = (pct: number) => {
+  function setAmountFromPercent(pct: number) {
     if (!fromToken) return;
     setSwapSuccessCta(false);
     if (!execBusy) clearSwapStatusBanner();
     try {
       const bal = BigInt(fromToken.amount);
       if (bal <= 0n) return;
-      const part = (bal * BigInt(pct)) / 100n;
+      const part = pct >= 100 ? bal : (bal * BigInt(pct)) / 100n;
       if (part <= 0n) return;
       setAmountStr(formatUnits(part, fromToken.decimals));
     } catch {
       /* ignore */
+    }
+  }
+
+  const maxAmount = () => {
+    setAmountFromPercent(100);
+  };
+
+  const applyAmountPercent = (pct: number) => {
+    setAmountFromPercent(pct);
+    setAmountQuickToggle('max');
+  };
+
+  const onMaxHalfToggle = () => {
+    if (amountQuickToggle === 'max') {
+      maxAmount();
+      setAmountQuickToggle('half');
+    } else {
+      setAmountFromPercent(50);
+      setAmountQuickToggle('max');
     }
   };
 
@@ -1391,6 +1400,7 @@ export function SwapView({
                   disabled={execBusy}
                   onChange={e => {
                     setSwapSuccessCta(false);
+                    setAmountQuickToggle('max');
                     if (!execBusy) clearSwapStatusBanner();
                     setAmountStr(e.target.value);
                   }}
@@ -1418,9 +1428,9 @@ export function SwapView({
                     type="button"
                     className="leet-pct leet-pct--max"
                     disabled={!fromToken || balancesBusy || execBusy}
-                    onClick={maxAmount}
+                    onClick={onMaxHalfToggle}
                   >
-                    MAX
+                    {amountQuickToggle === 'max' ? 'MAX' : 'Half'}
                   </button>
                 </div>
               </div>
