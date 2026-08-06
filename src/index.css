@@ -1,5 +1,6 @@
 :root {
-  --popup-min-height: 520px;
+  --popup-min-height: 600px;
+  --popup-width: 400px;
   /* 1337 — dark terminal palette (1337 Skulls style) */
   --bg: #050806;
   --bg-card: rgba(20, 20, 22, 0.9);
@@ -26,8 +27,6 @@
   --radius-pill: 999px;
   --font: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, monospace;
-  --bg-tile-image: url('/bg-tile.png');
-  --bg-tile-size: 280px;
   --bg-solid: #141416;
   --bg-panel: #18181c;
   --bg-overlay: #1c1c21;
@@ -69,9 +68,10 @@ body,
   margin: 0;
   min-height: var(--popup-min-height);
   height: 100%;
-  width: 380px;
-  min-width: 320px;
-  max-width: 420px;
+  width: var(--popup-width);
+  min-width: var(--popup-width);
+  max-width: min(440px, 100vw);
+  overflow-x: hidden;
   font-family: var(--font);
   font-size: 14px;
   line-height: 1.5;
@@ -97,6 +97,7 @@ html.leet-wide-surface body,
 html.leet-wide-surface #root {
   width: 100%;
   max-width: 560px;
+  min-width: 0;
   margin-left: auto;
   margin-right: auto;
   min-height: 100%;
@@ -193,38 +194,7 @@ h2 {
   display: flex;
   flex-direction: column;
   flex: 1;
-}
-
-/* Blurred 1337 Skulls tile behind everything, darkened toward the bottom */
-.wallet-shell::before,
-.unlock-screen::before {
-  content: '';
-  position: absolute;
-  inset: -12px;
-  z-index: 0;
-  background-image: var(--bg-tile-image);
-  background-repeat: repeat;
-  background-size: var(--bg-tile-size) auto;
-  background-position: center top;
-  filter: blur(4px) brightness(0.48) saturate(0.85);
-  pointer-events: none;
-}
-
-.wallet-shell::after,
-.unlock-screen::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  background:
-    radial-gradient(ellipse 120% 60% at 50% -10%, rgba(34, 197, 94, 0.07), transparent 55%),
-    linear-gradient(
-      to bottom,
-      rgba(5, 8, 6, 0.55) 0%,
-      rgba(5, 8, 6, 0.82) 45%,
-      rgba(5, 8, 6, 0.96) 100%
-    );
-  pointer-events: none;
+  overflow-x: hidden;
 }
 
 .wallet-shell > *,
@@ -247,7 +217,7 @@ h2 {
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 520px;
+  min-height: var(--popup-min-height);
   box-sizing: border-box;
 }
 
@@ -420,6 +390,9 @@ hr.sep {
   border-bottom: 1px solid rgba(34, 197, 94, 0.08);
   flex-shrink: 0;
   background: linear-gradient(180deg, rgba(5, 8, 6, 0.65) 0%, transparent 100%);
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .screen-header-left {
@@ -655,6 +628,8 @@ button.l33t-acct-trigger--dock.l33t-acct-trigger--open {
   z-index: 8;
   border-top: 1px solid var(--border);
   background: var(--bg);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .l33t-acct-sheet-mount {
@@ -924,17 +899,21 @@ button.bfox-main-header__addr:hover:not(:disabled) {
   min-height: var(--popup-min-height);
   height: 100%;
   width: 100%;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
 }
 
 .leet-route-layer {
   width: 100%;
+  max-width: 100%;
   min-height: var(--popup-min-height);
   height: 100%;
   flex: 1;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
   animation: leet-route-enter 380ms cubic-bezier(0.22, 1, 0.32, 1) both;
   will-change: opacity, transform, filter;
 }
@@ -1141,6 +1120,7 @@ button.bfox-main-header__addr:hover:not(:disabled) {
   color: var(--unlock-text);
   padding: 32px 24px 0;
   box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .unlock-screen--loading {
@@ -2754,9 +2734,12 @@ button.l33t-mm-tabs__btn--on:hover:not(:disabled) {
 .l33t-body--main {
   flex: 1;
   min-height: 0;
+  min-width: 0;
+  max-width: 100%;
   padding-top: 8px;
   padding-bottom: 12px;
   overflow: auto;
+  overflow-x: hidden;
 }
 
 /* Dapp connection footer — pinned to bottom of wallet shell */
@@ -3345,6 +3328,9 @@ button.l33t-tx-approval__fn-source-head:hover:not(:disabled) .l33t-tx-approval__
   z-index: 30;
   flex-shrink: 0;
   padding: 8px 12px 0;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .l33t-net-select {
