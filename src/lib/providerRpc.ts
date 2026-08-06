@@ -17,11 +17,11 @@ import {
 import { applyGasOverrides, type GasOverrideInput } from './gasOverrides';
 import {
   effectiveActiveChainId,
-  effectiveTxConfirmMode,
   loadPersisted,
   patchSettings,
   type AppSettings,
 } from './storageState';
+import { shouldQueueDappApproval } from './txConfirmMode';
 import { connectOrigin, isOriginConnected } from './dappConnections';
 import { chainJsonRpcCall } from './ethereum';
 import { reportProviderRpcFailure } from './devErrorReport';
@@ -229,9 +229,10 @@ export async function handleProviderRpc(
     }
 
     if (isSignMethod(method)) {
-      // Hardware always needs a device confirm in the wallet UI.
-      const mustConfirm =
-        opts?.hardware || !pk || effectiveTxConfirmMode(settings) === 'normal';
+      const mustConfirm = shouldQueueDappApproval(settings, {
+        hardware: opts?.hardware,
+        hasLocalKey: Boolean(pk),
+      });
       if (mustConfirm) {
         const approval = await queueApprovalRequest({
           request,

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { getAddress } from 'viem';
 import { getUnlockedAccount } from '../lib/accountSession';
 import { effectiveActiveChainId, type AppSettings } from '../lib/storageState';
-import { chainById } from '../lib/chainCatalog';
 import {
   fmtTokenAmount,
   fmtUsdValue,
@@ -26,7 +25,6 @@ export function WalletHomeView({
   const account = getUnlockedAccount();
   const addr = account ? getAddress(account.address) : null;
   const chainId = effectiveActiveChainId(settings);
-  const chain = chainById(chainId);
 
   const [rows, setRows] = useState<WalletBalEntry[]>([]);
   const [busy, setBusy] = useState(true);
@@ -61,15 +59,19 @@ export function WalletHomeView({
 
   return (
     <div className="l33t-home">
-      <div className="l33t-home-toolbar">
-        <button type="button" className="ghost l33t-refresh-btn" onClick={() => void refresh()} disabled={busy}>
-          {busy ? '…' : 'Refresh'}
+      <div className="l33t-home-refresh-row">
+        <button
+          type="button"
+          className={`l33t-icon-head l33t-refresh-icon${busy ? ' l33t-refresh-icon--busy' : ''}`}
+          aria-label="Refresh balances"
+          disabled={busy}
+          onClick={() => void refresh()}
+        >
+          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+            <path d="M21 3v6h-6" />
+          </svg>
         </button>
-      </div>
-
-      <div className="l33t-token-list-head">
-        <span>Tokens on {chain?.name ?? chainId}</span>
-        <span className="muted l33t-token-list-hint">Tap a token to send inline</span>
       </div>
 
       {err ? <p className="error l33t-home-error">{err}</p> : null}
@@ -115,6 +117,7 @@ export function WalletHomeView({
                   key={key}
                   token={t}
                   chainId={chainId}
+                  settings={settings}
                   onCollapse={() => setExpandedKey(null)}
                   onSent={() => void refresh()}
                 />

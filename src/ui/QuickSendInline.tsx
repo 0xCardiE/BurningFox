@@ -15,6 +15,8 @@ import {
   type WalletBalEntry,
 } from '../lib/walletBalances';
 import { describeError } from '../lib/utils';
+import { shouldConfirmInWalletSend } from '../lib/txConfirmMode';
+import type { AppSettings } from '../lib/storageState';
 
 const COLLAPSE_AFTER_SEC = 30;
 
@@ -94,11 +96,13 @@ function SendProgressPanel({ progress }: { progress: SendProgress }) {
 export function QuickSendInline({
   token,
   chainId,
+  settings,
   onCollapse,
   onSent,
 }: {
   token: WalletBalEntry;
   chainId: number;
+  settings: AppSettings;
   onCollapse: () => void;
   onSent: () => void;
 }) {
@@ -115,6 +119,7 @@ export function QuickSendInline({
   const [sendProgress, setSendProgress] = useState<SendProgress | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(COLLAPSE_AFTER_SEC);
   const [addrFocused, setAddrFocused] = useState(true);
+  const [confirming, setConfirming] = useState(false);
   const progressStartedRef = useRef<number | null>(null);
   const tipPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -130,12 +135,17 @@ export function QuickSendInline({
 
   const amountValid = amount != null && amount > 0n;
   const overBalance = amount != null && amount > balance;
+  const needsConfirm = shouldConfirmInWalletSend(settings);
   const canSend = !!to && amountValid && !overBalance && !busy;
 
   const fieldErr =
     err ??
     (toRaw.trim() && !toValid ? 'Invalid address' : null) ??
     (overBalance ? 'Amount exceeds balance' : null);
+
+  useEffect(() => {
+    setConfirming(false);
+  }, [toRaw, amountStr]);
 
   useEffect(
     () => () => {
@@ -236,6 +246,7 @@ export function QuickSendInline({
   }
 
   async function submit() {
+    setConfirming(false);
     const pk = getSessionPrivateKey();
     const meta = getActiveAccountMeta();
     if ((!pk && !(meta && isHardwareAccount(meta))) || !to || !amount) {
@@ -334,6 +345,15 @@ export function QuickSendInline({
       progressStartedRef.current = null;
       setBusy(false);
     }
+  }
+
+  function onSendClick() {
+    if (needsConfirm && !confirming) {
+      setConfirming(true);
+      setErr(null);
+      return;
+    }
+    void submit();
   }
 
   const explorerUrl = txHash ? txExplorerLink(chainId, txHash) : undefined;
@@ -447,16 +467,34 @@ export function QuickSendInline({
             type="button"
             className={`l33t-quick-send-inline__send primary${busy ? ' l33t-quick-send-inline__send--busy' : ''}`}
             disabled={!canSend}
-            onClick={() => void submit()}
+            onClick={onSendClick}
           >
             {busy ? (
               <span className="l33t-quick-send-inline__send-spinner" aria-hidden />
+            ) : confirming ? (
+              'Review'
             ) : (
               'Send'
             )}
           </button>
         </div>
       </div>
+      {confirming && !busy ? (
+        <div className="l33t-quick-send-inline__confirm">
+          <p className="l33t-quick-send-inline__confirm-text">
+            Send {amountStr.trim()} {token.symbol} to{' '}
+            <span className="mono">{to ? shortAddress(to) : '…'}</span>?
+          </p>
+          <div className="l33t-quick-send-inline__confirm-actions">
+            <button type="button" className="ghost" onClick={() => setConfirming(false)}>
+              Cancel
+            </button>
+            <button type="button" className="primary" onClick={() => void submit()}>
+              Confirm send
+            </button>
+          </div>
+        </div>
+      ) : null}
       {busy && sendProgress ? <SendProgressPanel progress={sendProgress} /> : null}
       {fieldErr ? <p className="error l33t-quick-send-inline__err">{fieldErr}</p> : null}
     </div>

@@ -280,7 +280,10 @@ export async function setActiveAccountId(accountId: string): Promise<void> {
 
 export async function patchSettings(patch: AppSettings): Promise<void> {
   const cur = await loadPersisted();
-  const merged = { ...cur.settings, ...patch };
+  const merged: AppSettings = { ...cur.settings, ...patch };
+  if (patch.txConfirmMode !== undefined) {
+    merged.txConfirmMode = normalizeTxConfirmMode(patch.txConfirmMode);
+  }
   applyRpcPreferences(merged);
   await savePersisted({
     ...cur,

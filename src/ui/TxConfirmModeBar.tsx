@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { L33tSegmented } from './L33tSelect';
 import {
   effectiveTxConfirmMode,
@@ -7,8 +8,8 @@ import {
 } from '../lib/storageState';
 
 const MODE_HINTS: Record<TxConfirmMode, string> = {
-  speed: 'Transactions confirm automatically when unlocked.',
-  normal: 'Review and confirm each dapp request.',
+  speed: 'Sign dapp requests and in-wallet sends immediately.',
+  normal: 'Confirm dapp requests and in-wallet sends before signing.',
 };
 
 export function TxConfirmModeToggle({
@@ -18,24 +19,41 @@ export function TxConfirmModeToggle({
   settings: AppSettings;
   onSaved: () => void;
 }) {
-  const mode = effectiveTxConfirmMode(settings);
+  const [mode, setMode] = useState<TxConfirmMode>(() => effectiveTxConfirmMode(settings));
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMode(effectiveTxConfirmMode(settings));
+  }, [settings.txConfirmMode]);
 
   async function onChange(next: string) {
-    await patchSettings({ txConfirmMode: next as TxConfirmMode });
-    onSaved();
+    const nextMode = next as TxConfirmMode;
+    if (nextMode === mode) return;
+    const prev = mode;
+    setMode(nextMode);
+    setErr(null);
+    try {
+      await patchSettings({ txConfirmMode: nextMode });
+      onSaved();
+    } catch (e) {
+      setMode(prev);
+      setErr(e instanceof Error ? e.message : String(e));
+    }
   }
 
   return (
-    <L33tSegmented
-      className="l33t-seg--compact"
-      value={mode}
-      onChange={onChange}
-      ariaLabel="Transaction confirmation mode"
-      title={MODE_HINTS[mode]}
-      options={[
-        { value: 'speed', label: 'Turbo' },
-        { value: 'normal', label: 'Normal' },
-      ]}
-    />
+    <>
+      <L33tSegmented
+        className="l33t-seg--compact"
+        value={mode}
+        onChange={onChange}
+        ariaLabel="Transaction confirmation mode"
+        options={[
+          { value: 'speed', label: 'Turbo', title: MODE_HINTS.speed },
+          { value: 'normal', label: 'Normal', title: MODE_HINTS.normal },
+        ]}
+      />
+      {err ? <span className="l33t-tx-mode-err">{err}</span> : null}
+    </>
   );
 }

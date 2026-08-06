@@ -210,21 +210,18 @@ export function L33tSegmented({
   options,
   ariaLabel = 'Options',
   className,
-  title,
 }: {
   value: string;
   onChange: (v: string) => void;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; title?: string }[];
   ariaLabel?: string;
   className?: string;
-  title?: string;
 }) {
   return (
     <div
       className={`l33t-seg${className ? ` ${className}` : ''}`}
       role="tablist"
       aria-label={ariaLabel}
-      title={title}
     >
       {options.map(opt => (
         <button
@@ -233,6 +230,7 @@ export function L33tSegmented({
           role="tab"
           aria-selected={value === opt.value}
           className={`l33t-seg__btn${value === opt.value ? ' l33t-seg__btn--on' : ''}`}
+          title={opt.title}
           onClick={() => onChange(opt.value)}
         >
           {opt.label}

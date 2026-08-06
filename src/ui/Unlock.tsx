@@ -46,9 +46,7 @@ export function Unlock({ onUnlocked }: { onUnlocked: () => void }) {
     <div className="unlock-screen">
       <div className="unlock-brand">
         <L33tBrand className="unlock-brand-stack" skullSize={96} wordmarkWidth={210} />
-        <p className="unlock-lead">
-          Enter your password to decrypt local keys. Hardware accounts are available after unlock.
-        </p>
+        <p className="unlock-lead">Enter your password to decrypt local keys.</p>
       </div>
 
       <form className="unlock-form" onSubmit={e => void submit(e)}>
