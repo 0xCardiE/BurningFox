@@ -2,8 +2,11 @@ import { formatUnits } from 'viem';
 import { getAddress } from 'viem';
 import { getTokens, getWalletBalances } from '@lifi/sdk';
 import { ChainType } from '@lifi/types';
+import type { Token } from '@lifi/types';
 import { chainById } from './chainCatalog';
+import { chainLogoUri } from './chainLogo';
 import { snapshotHeldTokensOnChain, type OnChainBalanceProbe } from './ethereum';
+import { isNativeToken } from './lifiHelpers';
 import { summarizeApiError } from './errors';
 
 export type WalletBalEntry = {
@@ -153,7 +156,60 @@ function nativeProbeForChain(chainId: number): OnChainBalanceProbe {
     decimals: chain?.nativeCurrency.decimals ?? 18,
     symbol: chain?.nativeCurrency.symbol ?? 'ETH',
     name: chain?.nativeCurrency.name ?? 'Ether',
+    logoURI: chain ? chainLogoUri(chain) : undefined,
   };
+}
+
+function nativeTokenFromCatalog(tokens: Token[] | undefined): Token | undefined {
+  return tokens?.find(t => isNativeToken(t.address));
+}
+
+function mergeNativeCatalogMeta(
+  probe: OnChainBalanceProbe,
+  catalog: Token | undefined,
+  chainId: number,
+): OnChainBalanceProbe {
+  if (!catalog) return probe;
+  const chain = chainById(chainId);
+  return {
+    ...probe,
+    name: catalog.name || probe.name,
+    symbol: catalog.symbol || probe.symbol,
+    decimals: catalog.decimals ?? probe.decimals,
+    logoURI: catalog.logoURI || probe.logoURI || (chain ? chainLogoUri(chain) : undefined),
+    priceUSD: catalog.priceUSD ?? probe.priceUSD,
+  };
+}
+
+async function enrichNativeRows(
+  chainId: number,
+  rows: WalletBalEntry[],
+): Promise<WalletBalEntry[]> {
+  if (!rows.some(r => isNativeWalletToken(r) && (!r.logoURI || !r.priceUSD))) {
+    return rows;
+  }
+
+  let catalog: Token | undefined;
+  try {
+    const res = await getTokens({
+      chains: [chainId],
+      chainTypes: [ChainType.EVM],
+      extended: true,
+    });
+    catalog = nativeTokenFromCatalog(res.tokens?.[chainId]);
+  } catch {
+    /* chain logo fallback still applies */
+  }
+
+  const chain = chainById(chainId);
+  return rows.map(row => {
+    if (!isNativeWalletToken(row)) return row;
+    return {
+      ...row,
+      logoURI: row.logoURI || catalog?.logoURI || (chain ? chainLogoUri(chain) : undefined),
+      priceUSD: row.priceUSD || catalog?.priceUSD,
+    };
+  });
 }
 
 /**
@@ -174,7 +230,9 @@ export async function loadWalletBalancesRpcForChain(
       extended: true,
       orderBy: 'volumeUSD24H',
     });
-    for (const t of res.tokens?.[chainId] ?? []) {
+    const catalogTokens = res.tokens?.[chainId] ?? [];
+    probes[0] = mergeNativeCatalogMeta(probes[0]!, nativeTokenFromCatalog(catalogTokens), chainId);
+    for (const t of catalogTokens) {
       const key = t.address.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
@@ -193,7 +251,7 @@ export async function loadWalletBalancesRpcForChain(
   }
 
   const rows = await snapshotHeldTokensOnChain(chainId, holder, probes);
-  return rows.map(r => ({ ...r, chainId }));
+  return enrichNativeRows(chainId, rows.map(r => ({ ...r, chainId })));
 }
 
 /** Multi-chain Li.FI balances with optional per-chain RPC fallback. */
@@ -271,6 +329,7 @@ export async function loadWalletBalancesForChain(
   }
 
   chainRows.sort(compareByUsd);
+  chainRows = await enrichNativeRows(chainId, chainRows);
   return { rows: chainRows, error: null };
 }
 

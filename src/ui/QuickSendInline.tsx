@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { encodeFunctionData, getAddress, isAddress, parseUnits, formatUnits } from 'viem';
-import { getActiveAccountMeta, getSessionPrivateKey } from '../lib/accountSession';
+import { getActiveAccountMeta, getSessionPrivateKey, getUnlockedAccount } from '../lib/accountSession';
 import { isHardwareAccount } from '../lib/accounts';
 import { ERC20_ABI } from '../lib/abis';
-import { sendErc20Transfer, sendNativeTransfer } from '../lib/backgroundSign';
-import { sendTransactionRequest, waitForChainReceipt } from '../lib/ethereum';
+import {
+  sendErc20Transfer,
+  sendNativeTransfer,
+} from '../lib/backgroundSign';
+import { chainJsonRpcCall, sendTransactionRequest, waitForChainReceipt } from '../lib/ethereum';
 import { txExplorerLink } from '../lib/explorerTxHistory';
 import {
   formatTokenAmount,
@@ -15,10 +18,77 @@ import { describeError } from '../lib/utils';
 
 const COLLAPSE_AFTER_SEC = 30;
 
+type SendPhase = 'preparing' | 'broadcasting' | 'pending';
+
+type SendProgress = {
+  phase: SendPhase;
+  headBlock?: number;
+  nonce?: number;
+  gasLimit?: number;
+  txHash?: string;
+  tipBlock?: number;
+  elapsedSec: number;
+  confirmBlock?: number;
+};
+
 function shortAddress(addr: string): string {
   const a = addr.trim();
   if (a.length <= 21) return a;
   return `${a.slice(0, 10)}…${a.slice(-10)}`;
+}
+
+function shortHash(hash: string): string {
+  return `${hash.slice(0, 10)}…${hash.slice(-8)}`;
+}
+
+function phaseLabel(phase: SendPhase): string {
+  switch (phase) {
+    case 'preparing':
+      return 'Preparing';
+    case 'broadcasting':
+      return 'Broadcasting';
+    case 'pending':
+      return 'Confirming';
+  }
+}
+
+function parseBlockNum(hex: string): number {
+  return Number.parseInt(hex, hex.startsWith('0x') ? 16 : 10);
+}
+
+function SendProgressPanel({ progress }: { progress: SendProgress }) {
+  const estBlocks =
+    progress.tipBlock != null && progress.headBlock != null
+      ? Math.max(0, progress.tipBlock - progress.headBlock)
+      : null;
+
+  return (
+    <div className="l33t-quick-send-inline__progress" aria-live="polite">
+      <div className="l33t-quick-send-inline__progress-head">
+        <span className="l33t-quick-send-inline__pulse" aria-hidden />
+        <span className="l33t-quick-send-inline__progress-phase">{phaseLabel(progress.phase)}</span>
+        <span className="l33t-quick-send-inline__progress-elapsed muted">{progress.elapsedSec}s</span>
+      </div>
+      <div className="l33t-quick-send-inline__progress-meta mono">
+        {progress.headBlock != null ? (
+          <span title="Chain head at broadcast">head #{progress.headBlock.toLocaleString()}</span>
+        ) : null}
+        {progress.nonce != null ? <span title="Account nonce">nonce {progress.nonce}</span> : null}
+        {progress.gasLimit != null ? (
+          <span title="Gas limit">gas {progress.gasLimit.toLocaleString()}</span>
+        ) : null}
+        {progress.txHash ? (
+          <span title={progress.txHash}>tx {shortHash(progress.txHash)}</span>
+        ) : null}
+        {progress.phase === 'pending' && progress.tipBlock != null ? (
+          <span title="Latest block while waiting">tip #{progress.tipBlock.toLocaleString()}</span>
+        ) : null}
+        {progress.phase === 'pending' && estBlocks != null && estBlocks > 0 ? (
+          <span title="Blocks since broadcast">+{estBlocks} blk</span>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 export function QuickSendInline({
@@ -37,11 +107,16 @@ export function QuickSendInline({
 
   const [toRaw, setToRaw] = useState('');
   const [amountStr, setAmountStr] = useState('');
+  const [amountQuickToggle, setAmountQuickToggle] = useState<'max' | 'half'>('max');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [confirmBlock, setConfirmBlock] = useState<number | null>(null);
+  const [sendProgress, setSendProgress] = useState<SendProgress | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(COLLAPSE_AFTER_SEC);
   const [addrFocused, setAddrFocused] = useState(true);
+  const progressStartedRef = useRef<number | null>(null);
+  const tipPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const toValid = toRaw.trim() && isAddress(toRaw.trim());
   const to = toValid ? getAddress(toRaw.trim()) : null;
@@ -62,6 +137,13 @@ export function QuickSendInline({
     (toRaw.trim() && !toValid ? 'Invalid address' : null) ??
     (overBalance ? 'Amount exceeds balance' : null);
 
+  useEffect(
+    () => () => {
+      if (tipPollRef.current) clearInterval(tipPollRef.current);
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!txHash) return;
     setSecondsLeft(COLLAPSE_AFTER_SEC);
@@ -75,17 +157,82 @@ export function QuickSendInline({
     };
   }, [txHash, onCollapse]);
 
-  function useMax() {
-    let max = balance;
-    if (native && balance > 0n) {
+  function tickElapsed(): number {
+    if (progressStartedRef.current == null) return 0;
+    return Math.floor((Date.now() - progressStartedRef.current) / 1000);
+  }
+
+  function patchProgress(patch: Partial<SendProgress>) {
+    setSendProgress(prev =>
+      prev
+        ? { ...prev, ...patch, elapsedSec: tickElapsed() }
+        : { phase: 'preparing', elapsedSec: tickElapsed(), ...patch },
+    );
+  }
+
+  function startTipPoll(headBlock: number) {
+    if (tipPollRef.current) clearInterval(tipPollRef.current);
+    tipPollRef.current = setInterval(() => {
+      void chainJsonRpcCall<string>(chainId, 'eth_blockNumber', [])
+        .then(hex => {
+          patchProgress({ tipBlock: parseBlockNum(hex), headBlock });
+        })
+        .catch(() => undefined);
+      patchProgress({});
+    }, 2000);
+  }
+
+  function stopTipPoll() {
+    if (tipPollRef.current) {
+      clearInterval(tipPollRef.current);
+      tipPollRef.current = null;
+    }
+  }
+
+  function setAmountFromPercent(pct: number) {
+    if (balance <= 0n) return;
+    let spendable = balance;
+    if (pct >= 100 && native) {
       try {
         const reserve = parseUnits('0.001', token.decimals);
-        if (balance > reserve) max = balance - reserve;
+        if (balance > reserve) spendable = balance - reserve;
       } catch {
         /* use full balance */
       }
     }
-    setAmountStr(formatUnits(max, token.decimals));
+    const part = pct >= 100 ? spendable : (balance * BigInt(pct)) / 100n;
+    if (part <= 0n) return;
+    setAmountStr(formatUnits(part, token.decimals));
+  }
+
+  function onMaxHalfToggle() {
+    if (amountQuickToggle === 'max') {
+      setAmountFromPercent(100);
+      setAmountQuickToggle('half');
+    } else {
+      setAmountFromPercent(50);
+      setAmountQuickToggle('max');
+    }
+  }
+
+  async function fetchChainMeta(from: `0x${string}`, txTo: `0x${string}`, data: `0x${string}`, value: bigint) {
+    const [headHex, nonceHex, gasHex] = await Promise.all([
+      chainJsonRpcCall<string>(chainId, 'eth_blockNumber', []),
+      chainJsonRpcCall<string>(chainId, 'eth_getTransactionCount', [from, 'pending']),
+      chainJsonRpcCall<string>(chainId, 'eth_estimateGas', [
+        {
+          from,
+          to: txTo,
+          data,
+          value: value ? `0x${value.toString(16)}` : '0x0',
+        },
+      ]),
+    ]);
+    return {
+      headBlock: parseBlockNum(headHex),
+      nonce: parseBlockNum(nonceHex),
+      gasLimit: Number((BigInt(gasHex) * 125n) / 100n),
+    };
   }
 
   async function submit() {
@@ -95,9 +242,37 @@ export function QuickSendInline({
       setErr('Wallet locked.');
       return;
     }
+
     setBusy(true);
     setErr(null);
+    setSendProgress(null);
+    progressStartedRef.current = Date.now();
+    patchProgress({ phase: 'preparing' });
+
     try {
+      const unlocked = getUnlockedAccount();
+      const from = unlocked?.address
+        ? getAddress(unlocked.address)
+        : meta?.address
+          ? getAddress(meta.address)
+          : null;
+      if (!from) {
+        setErr('Wallet locked.');
+        return;
+      }
+      const erc20Data = native
+        ? ('0x' as `0x${string}`)
+        : encodeFunctionData({
+            abi: ERC20_ABI,
+            functionName: 'transfer',
+            args: [to, amount],
+          });
+      const txTo = native ? to : getAddress(token.address);
+      const value = native ? amount : 0n;
+
+      const chainMeta = await fetchChainMeta(from, txTo, erc20Data, value);
+      patchProgress({ phase: 'broadcasting', ...chainMeta });
+
       let hash: string;
       if (meta && isHardwareAccount(meta)) {
         if (native) {
@@ -107,15 +282,10 @@ export function QuickSendInline({
             data: '0x',
           });
         } else {
-          const data = encodeFunctionData({
-            abi: ERC20_ABI,
-            functionName: 'transfer',
-            args: [to, amount],
-          });
           hash = await sendTransactionRequest(chainId, {
             to: getAddress(token.address),
             value: '0x0',
-            data,
+            data: erc20Data,
           });
         }
       } else {
@@ -129,12 +299,39 @@ export function QuickSendInline({
               amount,
             });
       }
+
+      patchProgress({
+        phase: 'pending',
+        txHash: hash,
+        ...chainMeta,
+      });
+      startTipPoll(chainMeta.headBlock);
+
       await waitForChainReceipt(hash, chainId);
+
+      stopTipPoll();
+      try {
+        const receipt = await chainJsonRpcCall<{ blockNumber?: string }>(
+          chainId,
+          'eth_getTransactionReceipt',
+          [hash],
+        );
+        if (receipt?.blockNumber) {
+          setConfirmBlock(parseBlockNum(receipt.blockNumber));
+        }
+      } catch {
+        /* optional */
+      }
+
       setTxHash(hash);
       onSent();
     } catch (e) {
+      stopTipPoll();
       setErr(describeError(e));
     } finally {
+      stopTipPoll();
+      setSendProgress(null);
+      progressStartedRef.current = null;
       setBusy(false);
     }
   }
@@ -155,10 +352,10 @@ export function QuickSendInline({
               target="_blank"
               rel="noopener noreferrer"
             >
-              View transaction
+              {shortHash(txHash)}
             </a>
           ) : (
-            <span className="mono muted">{txHash.slice(0, 10)}…</span>
+            <span className="mono muted">{shortHash(txHash)}</span>
           )}
         </div>
         <div className="l33t-quick-send-inline__done-meta">
@@ -167,6 +364,9 @@ export function QuickSendInline({
           </span>
           {sentTo ? (
             <span className="l33t-quick-send-inline__to muted">to {shortAddress(sentTo)}</span>
+          ) : null}
+          {confirmBlock != null ? (
+            <span className="l33t-quick-send-inline__block mono muted">blk #{confirmBlock.toLocaleString()}</span>
           ) : null}
           <span className="l33t-quick-send-inline__timer muted">{secondsLeft}s</span>
         </div>
@@ -178,7 +378,7 @@ export function QuickSendInline({
     addrFocused || !toValid ? toRaw : shortAddress(getAddress(toRaw.trim()));
 
   return (
-    <div className="l33t-quick-send-inline">
+    <div className={`l33t-quick-send-inline${busy ? ' l33t-quick-send-inline--sending' : ''}`}>
       <div className="l33t-quick-send-inline__row">
         <input
           className="l33t-quick-send-inline__addr"
@@ -196,7 +396,10 @@ export function QuickSendInline({
         <input
           className="l33t-quick-send-inline__amt"
           value={amountStr}
-          onChange={e => setAmountStr(e.target.value)}
+          onChange={e => {
+            setAmountQuickToggle('max');
+            setAmountStr(e.target.value);
+          }}
           placeholder="0.0"
           inputMode="decimal"
           autoComplete="off"
@@ -206,22 +409,27 @@ export function QuickSendInline({
           <button
             type="button"
             className="l33t-quick-send-inline__max"
-            onClick={useMax}
+            onClick={onMaxHalfToggle}
             disabled={busy}
-            title="Use max balance"
+            title={amountQuickToggle === 'max' ? 'Use max balance' : 'Use half balance'}
           >
-            Max
+            {amountQuickToggle === 'max' ? 'Max' : 'Half'}
           </button>
           <button
             type="button"
-            className="l33t-quick-send-inline__send primary"
+            className={`l33t-quick-send-inline__send primary${busy ? ' l33t-quick-send-inline__send--busy' : ''}`}
             disabled={!canSend}
             onClick={() => void submit()}
           >
-            {busy ? '…' : 'Send'}
+            {busy ? (
+              <span className="l33t-quick-send-inline__send-spinner" aria-hidden />
+            ) : (
+              'Send'
+            )}
           </button>
         </div>
       </div>
+      {busy && sendProgress ? <SendProgressPanel progress={sendProgress} /> : null}
       {fieldErr ? <p className="error l33t-quick-send-inline__err">{fieldErr}</p> : null}
     </div>
   );

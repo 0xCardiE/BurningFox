@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { getAddress } from 'viem';
 import { getUnlockedAccount } from '../lib/accountSession';
 import { effectiveActiveChainId, type AppSettings } from '../lib/storageState';
@@ -168,15 +168,7 @@ function TxDirectionIcon({ kind }: { kind: TxKind }) {
   );
 }
 
-function ExternalLinkIcon() {
-  return (
-    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" strokeLinecap="round" />
-      <polyline points="15 3 21 3 21 9" strokeLinecap="round" />
-      <line x1="10" y1="14" x2="21" y2="3" strokeLinecap="round" />
-    </svg>
-  );
-}
+const ROW_CLICK_DELAY_MS = 250;
 
 function DetailRow({
   label,
@@ -376,14 +368,41 @@ function TxHistoryRowItem({
   const amount = formatAmount(row, chainId);
   const url = txExplorerLink(chainId, row.hash);
   const failed = !row.success;
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+    },
+    [],
+  );
+
+  function handleClick() {
+    if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+    clickTimerRef.current = setTimeout(() => {
+      clickTimerRef.current = null;
+      onToggle();
+    }, ROW_CLICK_DELAY_MS);
+  }
+
+  function handleDoubleClick(e: MouseEvent) {
+    e.preventDefault();
+    if (clickTimerRef.current) {
+      clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = null;
+    }
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  }
 
   return (
     <li className={`l33t-tx-history__item${failed ? ' l33t-tx-history__item--failed' : ''}${expanded ? ' l33t-tx-history__item--open' : ''}`}>
       <button
         type="button"
         className="l33t-tx-history__row-btn"
-        onClick={onToggle}
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
         aria-expanded={expanded}
+        title={url ? `Double-click to open on ${explorerLabel}` : undefined}
       >
         <div className="l33t-tx-history__icon-wrap">
           <span className={`l33t-tx-history__icon l33t-tx-history__icon--${kind}`}>
@@ -424,20 +443,6 @@ function TxHistoryRowItem({
           </span>
         </div>
       </button>
-
-      {url ? (
-        <a
-          className="l33t-tx-history__explorer"
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          title={`View on ${explorerLabel}`}
-          aria-label={`View transaction on ${explorerLabel}`}
-          onClick={e => e.stopPropagation()}
-        >
-          <ExternalLinkIcon />
-        </a>
-      ) : null}
 
       {expanded ? (
         <div className="l33t-tx-history__detail">
