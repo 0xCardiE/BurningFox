@@ -17,5 +17,6 @@
     "resolveJsonModule": true,
     "useDefineForClassFields": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "files": ["src/chrome-env.d.ts"]
 }

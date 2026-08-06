@@ -2,6 +2,7 @@ import { defineConfig, build as viteBuild, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
 
 const root = dirname(fileURLToPath(import.meta.url));
 
@@ -44,6 +45,16 @@ function buildContentScripts(): Plugin {
             },
           });
         }
+
+        const trezorContentSrc = join(
+          root,
+          'node_modules/@trezor/connect-webextension/build/content-script.js',
+        );
+        if (existsSync(trezorContentSrc)) {
+          const vendorDir = join(root, 'dist/vendor');
+          mkdirSync(vendorDir, { recursive: true });
+          copyFileSync(trezorContentSrc, join(vendorDir, 'trezor-content-script.js'));
+        }
       } finally {
         nested = false;
       }
@@ -56,9 +67,28 @@ export default defineConfig({
   root,
   publicDir: 'public',
   base: './',
+  define: {
+    global: 'globalThis',
+  },
+  resolve: {
+    alias: {
+      buffer: 'buffer/',
+    },
+  },
+  optimizeDeps: {
+    include: ['buffer'],
+    esbuildOptions: {
+      define: {
+        global: 'globalThis',
+      },
+    },
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    commonjsOptions: {
+      transformMixedEsModules: true,
+    },
     rollupOptions: {
       input: {
         index: join(root, 'index.html'),

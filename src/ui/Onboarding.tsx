@@ -1,45 +1,52 @@
 import { useState } from 'react';
 import {
-  accountFromPrivateKey,
-  generateNewPrivateKey,
-  parseImportPrivateKey,
-} from '../lib/walletCore';
-import { encryptPrivateKey } from '../lib/vault';
-import { setVault } from '../lib/storageState';
-import { setUnlockedAccount } from '../lib/accountSession';
-import { persistSessionPrivateKey } from '../lib/sessionBridge';
+  createInitialPrivateKeyWallet,
+  createInitialWallet,
+  importInitialWallet,
+} from '../lib/walletManager';
 import { ScreenHeader } from './ScreenHeader';
 
 type Mode = 'create' | 'import';
+type CreateKind = 'seed' | 'privateKey';
+type ImportKind = 'seed' | 'privateKey';
 
 export function Onboarding({ onReady }: { onReady: () => void }) {
   const [mode, setMode] = useState<Mode>('create');
+  const [createKind, setCreateKind] = useState<CreateKind>('seed');
+  const [importKind, setImportKind] = useState<ImportKind>('seed');
   const [password, setPassword] = useState('');
   const [password2, setPassword2] = useState('');
-  const [importKey, setImportKey] = useState('');
+  const [importSecret, setImportSecret] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showBackup, setShowBackup] = useState(false);
+  const [backupMnemonic, setBackupMnemonic] = useState<string | null>(null);
   const [backupKey, setBackupKey] = useState<`0x${string}` | null>(null);
+
+  function validatePassword(): string | null {
+    if (password.length < 8) return 'Use a password of at least 8 characters.';
+    if (password !== password2) return 'Passwords do not match.';
+    return null;
+  }
 
   async function handleCreate() {
     setErr(null);
-    if (password.length < 8) {
-      setErr('Use a password of at least 8 characters.');
-      return;
-    }
-    if (password !== password2) {
-      setErr('Passwords do not match.');
+    const pwErr = validatePassword();
+    if (pwErr) {
+      setErr(pwErr);
       return;
     }
     setBusy(true);
     try {
-      const pk = generateNewPrivateKey();
-      const vault = await encryptPrivateKey(pk, password);
-      await setVault(vault);
-      setUnlockedAccount(accountFromPrivateKey(pk), pk);
-      await persistSessionPrivateKey(pk);
-      setBackupKey(pk);
+      if (createKind === 'seed') {
+        const { mnemonic, privateKey } = await createInitialWallet(password);
+        setBackupMnemonic(mnemonic);
+        setBackupKey(privateKey);
+      } else {
+        const { privateKey } = await createInitialPrivateKeyWallet(password);
+        setBackupMnemonic(null);
+        setBackupKey(privateKey);
+      }
       setShowBackup(true);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -50,21 +57,18 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
 
   async function handleImport() {
     setErr(null);
-    if (password.length < 8) {
-      setErr('Use a password of at least 8 characters.');
+    const pwErr = validatePassword();
+    if (pwErr) {
+      setErr(pwErr);
       return;
     }
-    if (password !== password2) {
-      setErr('Passwords do not match.');
+    if (!importSecret.trim()) {
+      setErr(importKind === 'seed' ? 'Enter your seed phrase.' : 'Enter a private key.');
       return;
     }
     setBusy(true);
     try {
-      const pk = parseImportPrivateKey(importKey);
-      const vault = await encryptPrivateKey(pk, password);
-      await setVault(vault);
-      setUnlockedAccount(accountFromPrivateKey(pk), pk);
-      await persistSessionPrivateKey(pk);
+      await importInitialWallet(password, importSecret);
       onReady();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -73,19 +77,38 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
     }
   }
 
-  if (showBackup && backupKey) {
+  if (showBackup && (backupMnemonic || backupKey)) {
     return (
       <div className="wallet-shell l33t">
         <ScreenHeader title="1337" />
         <div className="screen-body">
-          <h2 style={{ fontSize: '1.1rem', marginBottom: 8 }}>Back up your key</h2>
+          <h2 style={{ fontSize: '1.1rem', marginBottom: 8 }}>
+            {backupMnemonic ? 'Back up your seed phrase' : 'Back up your key'}
+          </h2>
           <p className="muted">
-            This is the only time we show the generated private key. Store it offline. Anyone with
-            it controls this wallet.
+            {backupMnemonic
+              ? 'Write these 12 words down offline. Anyone with this phrase can control every account derived from it. We will not show it again.'
+              : 'This is the only time we show the generated private key. Store it offline. Anyone with it controls this wallet.'}
           </p>
-          <div className="mono" style={{ margin: '12px 0' }}>
-            {backupKey}
-          </div>
+          {backupMnemonic ? (
+            <div
+              className="mono"
+              style={{
+                margin: '12px 0',
+                padding: 12,
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                lineHeight: 1.7,
+                wordSpacing: 4,
+              }}
+            >
+              {backupMnemonic}
+            </div>
+          ) : (
+            <div className="mono" style={{ margin: '12px 0' }}>
+              {backupKey}
+            </div>
+          )}
           <button
             type="button"
             className="primary"
@@ -106,94 +129,123 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
     <div className="wallet-shell l33t">
       <ScreenHeader title="1337" />
       <div className="screen-body">
-        <p className="muted" style={{ marginTop: 0 }}>
-          A developer burner wallet for testing. Create or import a private key — not meant for
-          securing real funds. Password only encrypts local storage in this browser.
+        <p className="muted" style={{ marginBottom: 14 }}>
+          Developer burner wallet. Create a seed phrase or private key, or import either — encrypted
+          locally with your password. Ledger / Trezor can be added later in Settings.
         </p>
-        <div className="nav" style={{ marginBottom: 12 }}>
+
+        <div className="row" style={{ marginBottom: 14 }}>
           <button
             type="button"
             className={mode === 'create' ? 'primary' : 'ghost'}
-            onClick={() => {
-              setMode('create');
-              setErr(null);
-            }}
+            onClick={() => setMode('create')}
           >
             Create
           </button>
           <button
             type="button"
             className={mode === 'import' ? 'primary' : 'ghost'}
-            onClick={() => {
-              setMode('import');
-              setErr(null);
-            }}
+            onClick={() => setMode('import')}
           >
             Import
           </button>
         </div>
-        {mode === 'import' && (
-          <>
-            <p
-              className="muted"
-              style={{
-                fontSize: 12,
-                marginBottom: 10,
-                padding: 10,
-                borderLeft: '3px solid var(--accent)',
-                background: 'rgba(255, 122, 0, 0.08)',
-              }}
+
+        {mode === 'create' ? (
+          <div className="row" style={{ marginBottom: 14 }}>
+            <button
+              type="button"
+              className={createKind === 'seed' ? 'primary' : 'ghost'}
+              onClick={() => setCreateKind('seed')}
             >
-              Import only keys you created yourself on a trusted device. If anyone else gave you
-              this key or a site generated it for you, assume it is compromised.
-            </p>
-            <label htmlFor="imp">Private key (hex)</label>
-            <textarea
-              id="imp"
-              value={importKey}
-              onChange={e => setImportKey(e.target.value)}
-              autoComplete="off"
-              placeholder="0x…"
-              spellCheck={false}
-            />
-          </>
+              Seed phrase
+            </button>
+            <button
+              type="button"
+              className={createKind === 'privateKey' ? 'primary' : 'ghost'}
+              onClick={() => setCreateKind('privateKey')}
+            >
+              Private key
+            </button>
+          </div>
+        ) : (
+          <div className="row" style={{ marginBottom: 14 }}>
+            <button
+              type="button"
+              className={importKind === 'seed' ? 'primary' : 'ghost'}
+              onClick={() => setImportKind('seed')}
+            >
+              Seed phrase
+            </button>
+            <button
+              type="button"
+              className={importKind === 'privateKey' ? 'primary' : 'ghost'}
+              onClick={() => setImportKind('privateKey')}
+            >
+              Private key
+            </button>
+          </div>
         )}
+
         <label htmlFor="pw">Password (encrypts local vault)</label>
         <input
           id="pw"
           type="password"
+          autoComplete="new-password"
           value={password}
           onChange={e => setPassword(e.target.value)}
-          autoComplete="new-password"
         />
         <label htmlFor="pw2">Confirm password</label>
         <input
           id="pw2"
           type="password"
+          autoComplete="new-password"
           value={password2}
           onChange={e => setPassword2(e.target.value)}
-          autoComplete="new-password"
         />
-        {err && <p className="error">{err}</p>}
-        {mode === 'create' ? (
-          <button
-            type="button"
-            style={{ marginTop: 12, width: '100%' }}
-            disabled={busy}
-            onClick={() => void handleCreate()}
-          >
-            {busy ? '…' : 'Generate wallet'}
-          </button>
-        ) : (
-          <button
-            type="button"
-            style={{ marginTop: 12, width: '100%' }}
-            disabled={busy}
-            onClick={() => void handleImport()}
-          >
-            {busy ? '…' : 'Import and encrypt'}
-          </button>
-        )}
+
+        {mode === 'import' ? (
+          <>
+            <label htmlFor="secret">
+              {importKind === 'seed' ? 'Seed phrase (12–24 words)' : 'Private key'}
+            </label>
+            <textarea
+              id="secret"
+              className="mono"
+              rows={importKind === 'seed' ? 4 : 3}
+              placeholder={
+                importKind === 'seed'
+                  ? 'word1 word2 word3 …'
+                  : '0x… or 64 hex chars'
+              }
+              value={importSecret}
+              onChange={e => setImportSecret(e.target.value)}
+              spellCheck={false}
+              autoCapitalize="none"
+              autoCorrect="off"
+            />
+          </>
+        ) : null}
+
+        {err ? <p className="error">{err}</p> : null}
+
+        <button
+          type="button"
+          className="primary"
+          style={{ width: '100%', marginTop: 12 }}
+          disabled={busy}
+          onClick={() => void (mode === 'create' ? handleCreate() : handleImport())}
+        >
+          {busy
+            ? 'Working…'
+            : mode === 'create'
+              ? createKind === 'seed'
+                ? 'Create with seed phrase'
+                : 'Create with private key'
+              : importKind === 'seed'
+                ? 'Import seed phrase'
+                : 'Import private key'}
+        </button>
       </div>
     </div>
   );

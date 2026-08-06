@@ -1,6 +1,6 @@
 /**
- * Encrypts the wallet private key with a user password (PBKDF2 + AES-GCM).
- * No mock data — decrypt fails with a clear error if the password is wrong.
+ * Encrypts wallet private key(s) with a user password (PBKDF2 + AES-GCM).
+ * v1 = single key bytes; v2 = JSON map of accountId → privateKey hex.
  */
 
 const PBKDF2_ITERATIONS = 210_000;
@@ -38,17 +38,23 @@ function bytesToHex(u8: Uint8Array): `0x${string}` {
   return s as `0x${string}`;
 }
 
-export interface EncryptedVault {
+export interface EncryptedVaultV1 {
   v: 1;
   saltB64: string;
   ivB64: string;
   ciphertextB64: string;
 }
 
-async function deriveKey(
-  password: string,
-  salt: Uint8Array,
-): Promise<CryptoKey> {
+export interface EncryptedVaultV2 {
+  v: 2;
+  saltB64: string;
+  ivB64: string;
+  ciphertextB64: string;
+}
+
+export type EncryptedVault = EncryptedVaultV1 | EncryptedVaultV2;
+
+async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
   const enc = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
@@ -60,7 +66,7 @@ async function deriveKey(
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt,
+      salt: salt as BufferSource,
       iterations: PBKDF2_ITERATIONS,
       hash: 'SHA-256',
     },
@@ -71,18 +77,19 @@ async function deriveKey(
   );
 }
 
+/** @deprecated Prefer encryptLocalKeys — kept for callers that still encrypt a single key. */
 export async function encryptPrivateKey(
   privateKey: `0x${string}`,
   password: string,
-): Promise<EncryptedVault> {
+): Promise<EncryptedVaultV1> {
   const salt = crypto.getRandomValues(new Uint8Array(SALT_LEN));
   const iv = crypto.getRandomValues(new Uint8Array(IV_LEN));
   const key = await deriveKey(password, salt);
   const raw = hexToBytes(privateKey);
   const ct = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
+    { name: 'AES-GCM', iv: iv as BufferSource },
     key,
-    raw,
+    raw as BufferSource,
   );
   return {
     v: 1,
@@ -92,11 +99,72 @@ export async function encryptPrivateKey(
   };
 }
 
+export interface VaultSecrets {
+  keys: Record<string, `0x${string}`>;
+  /** Optional BIP-39 mnemonic (encrypted with the same vault password). */
+  mnemonic?: string;
+}
+
+/** @deprecated Prefer decryptVaultSecrets */
 export async function decryptPrivateKey(
   vault: EncryptedVault,
   password: string,
 ): Promise<`0x${string}`> {
-  if (vault.v !== 1) throw new Error('Unsupported vault version');
+  const { keys } = await decryptVaultSecrets(vault, password);
+  const first = Object.values(keys)[0];
+  if (!first) throw new Error('Vault has no keys');
+  return first;
+}
+
+export async function encryptLocalKeys(
+  keys: Record<string, `0x${string}`>,
+  password: string,
+  mnemonic?: string,
+): Promise<EncryptedVaultV2> {
+  return encryptVaultSecrets({ keys, mnemonic }, password);
+}
+
+export async function encryptVaultSecrets(
+  secrets: VaultSecrets,
+  password: string,
+): Promise<EncryptedVaultV2> {
+  const salt = crypto.getRandomValues(new Uint8Array(SALT_LEN));
+  const iv = crypto.getRandomValues(new Uint8Array(IV_LEN));
+  const key = await deriveKey(password, salt);
+  const body: VaultSecrets = {
+    keys: secrets.keys,
+    ...(secrets.mnemonic?.trim() ? { mnemonic: secrets.mnemonic.trim() } : {}),
+  };
+  const payload = new TextEncoder().encode(JSON.stringify(body));
+  const ct = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: iv as BufferSource },
+    key,
+    payload as BufferSource,
+  );
+  return {
+    v: 2,
+    saltB64: toB64(salt),
+    ivB64: toB64(iv),
+    ciphertextB64: toB64(new Uint8Array(ct)),
+  };
+}
+
+/** @deprecated Prefer decryptVaultSecrets */
+export async function decryptLocalKeys(
+  vault: EncryptedVault,
+  password: string,
+): Promise<Record<string, `0x${string}`>> {
+  const { keys } = await decryptVaultSecrets(vault, password);
+  return keys;
+}
+
+export async function decryptVaultSecrets(
+  vault: EncryptedVault,
+  password: string,
+): Promise<VaultSecrets> {
+  if (vault.v !== 1 && vault.v !== 2) {
+    throw new Error('Unsupported vault version');
+  }
   const salt = fromB64(vault.saltB64);
   const iv = fromB64(vault.ivB64);
   const ciphertext = fromB64(vault.ciphertextB64);
@@ -104,15 +172,52 @@ export async function decryptPrivateKey(
   let plain: ArrayBuffer;
   try {
     plain = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv },
+      { name: 'AES-GCM', iv: iv as BufferSource },
       key,
-      ciphertext,
+      ciphertext as BufferSource,
     );
   } catch {
     throw new Error('Wrong password or corrupted vault');
   }
-  if (plain.byteLength !== 32) {
-    throw new Error('Decrypted key has invalid length');
+
+  if (vault.v === 1) {
+    if (plain.byteLength !== 32) {
+      throw new Error('Decrypted key has invalid length');
+    }
+    const pk = bytesToHex(new Uint8Array(plain));
+    return { keys: { legacy: pk } };
   }
-  return bytesToHex(new Uint8Array(plain));
+
+  const text = new TextDecoder().decode(plain);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error('Corrupted vault payload');
+  }
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('Corrupted vault payload');
+  }
+
+  const row = parsed as Record<string, unknown>;
+  const keysRaw =
+    row.keys && typeof row.keys === 'object'
+      ? (row.keys as Record<string, unknown>)
+      : row;
+  const out: Record<string, `0x${string}`> = {};
+  for (const [id, value] of Object.entries(keysRaw)) {
+    if (id === 'mnemonic' || id === 'keys') continue;
+    if (typeof value !== 'string') continue;
+    if (!/^0x[0-9a-fA-F]{64}$/.test(value)) continue;
+    out[id] = value.toLowerCase() as `0x${string}`;
+  }
+  if (Object.keys(out).length === 0) {
+    throw new Error('Vault has no keys');
+  }
+
+  const mnemonic =
+    typeof row.mnemonic === 'string' && row.mnemonic.trim()
+      ? row.mnemonic.trim()
+      : undefined;
+  return { keys: out, mnemonic };
 }

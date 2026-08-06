@@ -9,6 +9,20 @@ import {
   type ChainKind,
 } from './chainCatalog';
 import { setPreferredRpcMap, setCustomRpcMap, setCustomChainRpcCatalog } from './chainRpcRegistry';
+import {
+  normalizeAccounts,
+  resolveActiveAccountId,
+  type WalletAccount,
+} from './accounts';
+
+export type { WalletAccount } from './accounts';
+export {
+  accountKindLabel,
+  DEFAULT_ETH_DERIVATION_PATH,
+  getActiveAccount,
+  isHardwareAccount,
+  shortAddress,
+} from './accounts';
 
 export type ToolbarOpenMode = 'popup' | 'side_panel';
 /** Speed = auto-confirm dapp requests when unlocked; normal = prompt each time. */
@@ -39,6 +53,9 @@ export interface AppSettings {
 
 export interface PersistedState {
   vault: EncryptedVault | null;
+  /** Public account metadata (local + hardware). Local keys live encrypted in vault. */
+  accounts: WalletAccount[];
+  activeAccountId?: string;
   settings: AppSettings;
 }
 
@@ -49,6 +66,7 @@ const KEY = WALLET_PERSIST_KEY;
 
 const EMPTY: PersistedState = {
   vault: null,
+  accounts: [],
   settings: {},
 };
 
@@ -175,8 +193,16 @@ export async function loadPersisted(): Promise<PersistedState> {
         return;
       }
       const tm = normalizeToolbarOpenMode(row.settings?.toolbarOpenMode);
+      const accounts = normalizeAccounts(
+        (row as PersistedState).accounts ?? (row as { accounts?: unknown }).accounts,
+      );
       const next: PersistedState = {
         vault: row.vault ?? null,
+        accounts,
+        activeAccountId: resolveActiveAccountId(
+          accounts,
+          (row as PersistedState).activeAccountId,
+        ),
         settings: {
           slippagePercent: normalizeSlippagePercent(row.settings?.slippagePercent),
           autoLockMinutes: normalizeAutoLockMinutes(row.settings?.autoLockMinutes),
@@ -217,7 +243,39 @@ export async function savePersisted(next: PersistedState): Promise<void> {
 
 export async function setVault(vault: EncryptedVault | null): Promise<void> {
   const cur = await loadPersisted();
+  if (vault == null) {
+    await savePersisted({
+      ...cur,
+      vault: null,
+      accounts: [],
+      activeAccountId: undefined,
+    });
+    return;
+  }
   await savePersisted({ ...cur, vault });
+}
+
+export async function saveAccountsState(patch: {
+  vault?: EncryptedVault | null;
+  accounts: WalletAccount[];
+  activeAccountId?: string;
+}): Promise<void> {
+  const cur = await loadPersisted();
+  const accounts = normalizeAccounts(patch.accounts);
+  await savePersisted({
+    ...cur,
+    vault: patch.vault !== undefined ? patch.vault : cur.vault,
+    accounts,
+    activeAccountId: resolveActiveAccountId(accounts, patch.activeAccountId),
+  });
+}
+
+export async function setActiveAccountId(accountId: string): Promise<void> {
+  const cur = await loadPersisted();
+  if (!cur.accounts.some(a => a.id === accountId)) {
+    throw new Error('Account not found.');
+  }
+  await savePersisted({ ...cur, activeAccountId: accountId });
 }
 
 export async function patchSettings(patch: AppSettings): Promise<void> {

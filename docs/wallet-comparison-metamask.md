@@ -1,129 +1,123 @@
-# Security comparison: MetaMask vs 1337
+# Security comparison: 1337 wallet types vs MetaMask
 
-Side-by-side view of how **MetaMask** (typical browser-extension hot wallet) compares to **1337** (this project — a developer burner wallet). Both are software hot wallets; neither is cold or hardware custody.
+Side-by-side view of **every 1337 account type** against the closest **MetaMask** equivalent. 1337 is a Chrome MV3 developer / burner wallet; MetaMask is a general-purpose browser hot wallet. Hardware rows describe keys that never leave the device.
 
-Sources for 1337: `src/lib/vault.ts`, `src/background.ts`, `src/lib/sessionBridge.ts`, `src/lib/providerRpc.ts`, `src/lib/storageState.ts`, `public/manifest.json`.
-
----
-
-## Comparison table
-
-| Topic | MetaMask (hot) | 1337 (hot) |
-|-------|----------------|---------------|
-| **Wallet type** | Software key in browser extension | Software key in Chrome MV3 extension (single EVM private key, not HD/mnemonic) |
-| **Key at rest** | Password-encrypted vault in browser storage | Password-encrypted vault in `chrome.storage.local` (`leet_wallet_v1`) |
-| **Vault crypto** | PBKDF2 / scrypt-style KDF + symmetric encryption | PBKDF2 (210k iterations, SHA-256) + AES-GCM-256 |
-| **While unlocked** | Decrypted key in extension memory | Decrypted key in service worker memory, popup memory, **and** plaintext hex in `chrome.storage.session` |
-| **Session persistence** | Stays unlocked after closing the UI (until lock or auto-lock) | Same — session held in MV3 service worker + session storage across popup/side-panel close |
-| **Session on disk** | Typically memory-only while unlocked | **Plaintext private key** in `chrome.storage.session` (`l33t_session_pk`) plus in-memory copies |
-| **Unlock** | Password once per session | Password once per session (decrypt vault → push key to background session) |
-| **Auto-lock** | Optional user setting | Optional user setting; **default off** (choices: off, 5, 15, 30, 60 min idle) |
-| **Explicit lock** | Yes | Yes (Settings → Lock; clears session everywhere) |
-| **Approve before sign** | Yes — per tx / sign request | **Configurable:** default **Turbo** auto-signs when unlocked; **Normal** mode queues per-request approval (`TxApprovalSheet`) |
-| **Password per action** | No (while unlocked) | No (while unlocked) |
-| **Websites can request signatures** | Yes (`window.ethereum`) | Yes — full EIP-1193 provider injected; can replace MetaMask on pages (`replaceMetaMask`, default on) |
-| **Offline vault attack** | Encrypted vault can be password-guessed | Same — offline dump of `chrome.storage.local` yields ciphertext; attacker must brute-force password |
-| **Unlocked + malware** | Key usable from memory | Key usable from memory **and** readable from session storage; Turbo mode allows auto-signed dApp requests |
-| **Close UI = locked?** | No | No |
-| **Browser restart** | Session cleared; vault remains | Session cleared; encrypted vault + settings remain in `chrome.storage.local` |
-| **Fundamental security class** | Hot software wallet | Hot software wallet (explicitly scoped as a developer burner — not for securing real funds) |
+Sources for 1337: `src/lib/vault.ts`, `src/lib/walletCore.ts`, `src/lib/walletManager.ts`, `src/lib/ledger.ts`, `src/lib/trezor.ts`, `src/background.ts`, `src/lib/providerRpc.ts`, `public/manifest.json`.
 
 ---
 
-## Topic notes
+## Wallet types covered
 
-### Wallet type
+| 1337 type | How you get it | Closest MetaMask equivalent |
+|--------------|----------------|-----------------------------|
+| **Local seed (HD)** | Create / import BIP-39 phrase; derive `m/44'/60'/0'/0/n` | MetaMask default wallet (Secret Recovery Phrase) |
+| **Local private key** | Generate or import a single hex key (no seed) | MetaMask “Import account” → Private key |
+| **Ledger** | Connect Ledger via WebHID; address + path stored | MetaMask “Connect hardware wallet” → Ledger |
+| **Trezor** | Connect via Trezor Connect popup; address + path stored | MetaMask “Connect hardware wallet” → Trezor |
 
-Both are browser-extension hot wallets. MetaMask is a general-purpose HD wallet (seed phrase, multiple accounts). 1337 stores a **single imported/generated private key** — simpler model, no BIP-39 recovery phrase in this codebase.
+---
 
-### Key at rest & vault crypto
+## Master comparison
 
-Both encrypt the vault with a user password before writing to durable browser storage. 1337’s parameters are fixed and visible in code:
+| Topic | MetaMask (software / SRP) | 1337 local seed | 1337 local private key | MetaMask + Ledger/Trezor | 1337 Ledger / Trezor |
+|-------|---------------------------|--------------------|---------------------------|--------------------------|-------------------------|
+| **Custody class** | Hot software | Hot software | Hot software | Cold keys, hot UI | Cold keys, hot UI |
+| **Secret at rest** | Encrypted vault (SRP + derived keys) | Encrypted vault (`keys` + optional `mnemonic`) in `chrome.storage.local` | Encrypted vault (`keys` only) | Device holds seed; MM stores pubkey metadata | Device holds seed; 1337 stores address / path / label only |
+| **Vault crypto** | KDF + symmetric encryption | PBKDF2 210k SHA-256 + AES-GCM-256 | Same | N/A for device seed | N/A for device seed |
+| **Recovery** | 12-word SRP | 12-word BIP-39 (create default); 12–24 on import | Hex private key backup only | Device seed / backup (Ledger/Trezor flow) | Same device recovery model |
+| **Multi-account** | HD accounts from SRP | HD accounts via “Add from seed” | One key per account; generate/import more | Multiple device paths / accounts | Path field + multiple hardware accounts |
+| **While unlocked** | Decrypted material in extension memory | Keys (+ mnemonic) in UI memory; **active PK plaintext in `chrome.storage.session`** | Same session model | MM session for UI; signatures on device | Same; **no PK in session** for hardware — address + path only |
+| **Signing location** | Extension (software) | Extension (viem) | Extension (viem) | Device (MM prompts device) | Device (Ledger WebHID / Trezor Connect) |
+| **dApp confirm default** | Confirm every request | **Turbo** auto-sign when unlocked (Normal = confirm) | Same | Confirm in MM + on device | Hardware always needs device confirm; Normal/Turbo queues UI then device |
+| **Auto-lock default** | User setting | **Off** by default | Same | Same as MM software session | Same 1337 auto-lock (session metadata) |
+| **Close UI = locked?** | No | No | No | No | No |
+| **Browser restart** | Relock; vault remains | Relock; vault remains | Same | Relock MM; device unchanged | Relock 1337; device unchanged |
+| **Offline vault dump** | Password-guess ciphertext | Same (+ mnemonic inside ciphertext if present) | Same (keys only) | No seed in browser | No seed in browser |
+| **Unlocked malware** | Can sign / exfiltrate hot keys | Can sign / read session PK (+ mnemonic in UI memory) | Can sign / read session PK | Can request signatures; still needs device approval | Can request signatures; still needs device approval |
+| **Intended use** | General self-custody | Dev / burner HD wallet | Dev / single-key burner | Higher-security self-custody | Same class as MM+HW inside 1337 UX |
 
-- PBKDF2: 210,000 iterations, SHA-256
-- AES-GCM-256 with random 16-byte salt and 12-byte IV
-- Minimum password length: 8 characters
+---
 
-MetaMask uses a similar class of KDF + symmetric encryption (exact iteration counts vary by version). The practical offline attack surface is the same: **encrypted blob + password guessing**.
+## Topic notes by wallet type
 
-### While unlocked & session on disk
+### 1. MetaMask software (Secret Recovery Phrase)
 
-This is the largest architectural difference.
+- BIP-39 SRP → HD derivation; many accounts from one backup.
+- Password encrypts the vault at rest; unlocked session is the main hot-wallet risk.
+- Default UX: **review every** dApp sign/send in the extension.
 
-| | MetaMask | 1337 |
-|---|----------|---------|
-| In-memory key | Yes | Yes (service worker + popup) |
-| Encrypted session blob on disk while unlocked | Typically no | **No encryption** — full hex private key in `chrome.storage.session` |
+**1337 local seed** matches this *model* (create/import phrase, derive `m/44'/60'/0'/0/n`) but keeps 1337’s **speed defaults**: Turbo auto-sign, optional auto-lock off, and plaintext **active** private key in `chrome.storage.session` while unlocked.
 
-If malware or another compromised extension can read session storage for this extension profile, 1337 exposes the raw key without re-entering the password. MetaMask generally keeps the decrypted key in extension memory only while unlocked.
+### 2. 1337 local seed (HD)
 
-### Session persistence & close UI
+- Create generates a **12-word** English BIP-39 phrase; import accepts **12–24** words.
+- Phrase is stored **inside the encrypted vault payload** (`mnemonic` + per-account private keys).
+- “Add from seed” derives the next index (Account 1, 2, …) like MetaMask’s account list.
+- Backup surface is the **seed phrase** (controls all derived accounts), not only one key.
 
-Neither wallet locks when you close the popup. 1337 relies on the MV3 service worker to keep the session alive so reopening the side panel does not require unlock. Lock, auto-lock expiry, wipe, or browser restart end the session.
+### 3. 1337 local private key (and MetaMask “Import private key”)
 
-### Auto-lock
+- Single secp256k1 key; no HD parent in the vault unless you separately import a seed.
+- Create-without-seed or import hex `0x` + 64 chars.
+- MetaMask equivalent: **Import account → Private key** (still lives in MM’s encrypted vault).
+- Same 1337 unlocked-session caveats as seed accounts for that active key.
 
-MetaMask offers optional idle auto-lock. 1337 also offers it but ships with **auto-lock disabled by default** — a convenience-first default for a burner/dev wallet. When enabled, idle time is tracked via activity pings from the wallet UI and content script (dApp RPC activity alone does not reset the timer).
+### 4. MetaMask + Ledger / Trezor
 
-### Approve before sign
+- MetaMask is the dApp bridge and UI; **private keys stay on the device**.
+- User confirms on the hardware screen; MM never learns the seed.
+- Best practice for meaningful funds when you still want a browser wallet UX.
 
-MetaMask’s default UX is **always confirm** in the wallet UI before signing.
+### 5. 1337 Ledger / Trezor
 
-1337 defaults to **Turbo** (`txConfirmMode: 'speed'`): when unlocked, dApp signing methods (`eth_sendTransaction`, `personal_sign`, `eth_sign`, typed data variants) execute immediately without a confirmation sheet. Switching to **Normal** mode queues each request for explicit approval in `TxApprovalSheet`.
+- **Ledger:** `@ledgerhq/hw-transport-webhid` + `@ledgerhq/hw-app-eth` (Chrome `hid` permission). Blind signing may be required depending on app settings.
+- **Trezor:** `@trezor/connect-webextension` in the service worker; Connect popup on `connect.trezor.io`.
+- Persisted data: address, label, derivation path, kind — **never** the device seed.
+- Signing for sends / swaps / dApp `eth_sendTransaction` goes through the device SDK; message signing (personal_sign / typed data) is not fully wired for hardware yet — use a local account or MM for those flows today.
 
-Internal extension actions (swap, multi-send, gas station, etc.) sign directly via the unlocked account — they do not go through the dApp approval queue regardless of mode.
+---
 
-### Websites can request signatures
+## Threat model cheat sheet
 
-Both expose `window.ethereum` to web pages. 1337 injects a full EIP-1193 provider (`src/inpage/provider.ts` → content script → background `PROVIDER_RPC`). By default it can replace MetaMask as `window.ethereum`.
+| Threat | Local seed / PK (1337) | Ledger / Trezor (1337 or MM) |
+|--------|---------------------------|----------------------------------|
+| Stolen locked browser profile | Password-guess vault | Address metadata only; funds need device |
+| Stolen unlocked browser profile | **High** — session PK (+ seed in 1337 UI memory if present) | Attacker can *prompt* signs; user must approve on device |
+| Malicious dApp | Turbo may auto-sign (1337); enable Normal | Device shows tx; user is last line of defense |
+| Phishing fake extension | Same as any hot wallet | Device still protects if user verifies address/amount on screen |
+| Lost backup | Lose seed or PK → lose funds | Device seed/backup process (vendor-specific) |
 
-Connection model: `eth_requestAccounts` auto-connects the origin when the wallet is unlocked; users can also connect manually from the wallet UI.
+---
 
-### Offline vault attack
+## Practical recommendations
 
-Attacker with a copy of locked storage gets an encrypted vault. Security reduces to password strength and KDF cost. 1337 uses 210k PBKDF2 iterations — reasonable but not hardware-wallet grade.
-
-**Additional 1337 risk:** if the attacker has an **unlocked** browser profile (live session or `chrome.storage.session` dump before restart), they get the plaintext key without the password.
-
-### Unlocked + malware
-
-Both wallets are fully compromised while unlocked if hostile code runs with extension privileges or can read extension memory/storage.
-
-1337 adds:
-
-- Plaintext session key in `chrome.storage.session`
-- Default Turbo auto-sign for dApp requests
-- `<all_urls>` host permission for RPC/API calls (needed for flexible endpoints — trust your RPC and quote sources)
-
-### Browser restart
-
-`chrome.storage.session` is cleared when the browser exits. The encrypted vault in `chrome.storage.local` persists. User must unlock again. Connected dApp origins (also session-scoped) are lost on restart.
+1. **Burner / test funds** — 1337 local seed or private key is fine; keep Turbo if you want speed; enable auto-lock if the machine is shared.
+2. **Real funds in browser** — Prefer **Ledger or Trezor** (1337 or MetaMask), Normal confirmations, verify every device prompt.
+3. **MetaMask vs 1337 software** — Same custody *class*; MetaMask wins on conservative defaults (confirm-every-tx, mature SRP UX). 1337 wins on multi-RPC / LiFi / multi-send / burner workflow — accept hotter unlocked-state tradeoffs.
+4. **Seed vs private key in 1337** — Prefer **seed** if you want MetaMask-like multiple derived accounts from one backup. Use **private key** for disposable single-account burners.
 
 ---
 
 ## Summary
 
-| Dimension | MetaMask | 1337 |
-|-----------|----------|---------|
-| Custody class | Hot software wallet | Hot software wallet (burner / dev scope) |
-| Vault encryption | Strong, industry-standard pattern | Strong, explicit PBKDF2 + AES-GCM |
-| Unlocked session on disk | Usually memory-only | **Plaintext key in session storage** |
-| Default signing UX | Confirm every request | **Auto-sign when unlocked (Turbo)** |
-| dApp bridge | Yes | Yes (can replace MetaMask) |
-| Auto-lock default | User-configured | **Off by default** |
-| Intended use | General-purpose self-custody | Fast dev/burner workflows — not for large holdings |
+| Dimension | Safest in this matrix | Notes |
+|-----------|----------------------|--------|
+| Key never in browser | Ledger / Trezor (1337 or MM) | Best for value |
+| Familiar HD recovery | MetaMask SRP ≈ 1337 local seed | 1337 seed is newer; verify backups |
+| Disposable account | 1337 private key | No phrase to leak across accounts |
+| Default signing safety | MetaMask | 1337 Turbo is convenience-first |
+| Unlocked session on disk | MetaMask (typically memory) | 1337 stores active PK in session storage |
 
-1337 trades MetaMask’s **separation + explicit review** defaults for **speed**: stay unlocked, auto-sign dApp traffic in Turbo mode, and persist the session across UI closes. That is appropriate for a labeled burner wallet only if users understand they are accepting hot-wallet risk with a weaker unlocked-state model than MetaMask.
-
-For material funds: use MetaMask (or similar) with confirmations enabled, a hardware wallet, or offline custody — not 1337 defaults.
+For material holdings: **hardware wallet + confirm-on-device**, whether through MetaMask or 1337. Treat 1337 software accounts as **hot burners** unless you consciously harden (Normal mode, auto-lock, strong password, separate browser profile).
 
 ---
 
 ## Related docs & source
 
 - [Wallet security model](./wallet-security.md) — operational risks and mitigations
-- `src/lib/vault.ts` — vault encryption
+- `src/lib/walletCore.ts` — mnemonic + private key helpers
+- `src/lib/vault.ts` — vault encryption (`keys` + optional `mnemonic`)
+- `src/lib/walletManager.ts` — create / import / derive accounts
+- `src/lib/ledger.ts` / `src/lib/trezor.ts` — hardware SDKs
 - `src/background.ts` — session persistence, auto-lock
 - `src/lib/providerRpc.ts` — dApp RPC and Turbo vs Normal signing
-- `src/ui/TxApprovalSheet.tsx` — Normal-mode approval UI
-- `src/ui/SettingsView.tsx` — lock, auto-lock, storage explanation

@@ -549,6 +549,103 @@ hr.sep {
   gap: 12px;
 }
 
+.bfox-account-switcher {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+.bfox-account-switcher__kind {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0;
+  margin-top: 1px;
+}
+
+.bfox-account-menu {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 4px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  background: var(--bg-elevated, var(--bg-card));
+  border: 1px solid var(--border-strong, var(--border));
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.bfox-account-menu__item {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  background: transparent;
+  color: var(--text);
+  border: none;
+  border-radius: 8px;
+  text-align: left;
+  font-weight: 500;
+}
+
+.bfox-account-menu__item:hover,
+.bfox-account-menu__item.is-active {
+  background: var(--accent-soft-2, rgba(255, 255, 255, 0.06));
+}
+
+.bfox-account-menu__label {
+  font-size: 13px;
+}
+
+.bfox-account-manage-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bfox-account-manage-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+}
+
+.bfox-account-manage-item.is-active {
+  border-color: var(--ok, #22c55e);
+}
+
+.bfox-account-manage-select {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 6px 8px;
+  background: transparent;
+  color: var(--text);
+  border: none;
+  text-align: left;
+  font-weight: 500;
+}
+
+.bfox-account-manage-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bfox-main-header__addr,
 .l33t-main-header__addr {
   flex: 1;
   min-width: 0;

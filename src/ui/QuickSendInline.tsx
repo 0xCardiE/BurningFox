@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { getAddress, isAddress, parseUnits, formatUnits } from 'viem';
-import { getSessionPrivateKey } from '../lib/accountSession';
+import { encodeFunctionData, getAddress, isAddress, parseUnits, formatUnits } from 'viem';
+import { getActiveAccountMeta, getSessionPrivateKey } from '../lib/accountSession';
+import { isHardwareAccount } from '../lib/accounts';
+import { ERC20_ABI } from '../lib/abis';
 import { sendErc20Transfer, sendNativeTransfer } from '../lib/backgroundSign';
-import { waitForChainReceipt } from '../lib/ethereum';
+import { sendTransactionRequest, waitForChainReceipt } from '../lib/ethereum';
 import { txExplorerLink } from '../lib/explorerTxHistory';
 import {
   formatTokenAmount,
@@ -88,22 +90,45 @@ export function QuickSendInline({
 
   async function submit() {
     const pk = getSessionPrivateKey();
-    if (!pk || !to || !amount) {
+    const meta = getActiveAccountMeta();
+    if ((!pk && !(meta && isHardwareAccount(meta))) || !to || !amount) {
       setErr('Wallet locked.');
       return;
     }
     setBusy(true);
     setErr(null);
     try {
-      const hash = native
-        ? await sendNativeTransfer({ pk, chainId, to, amount })
-        : await sendErc20Transfer({
-            pk,
-            chainId,
-            token: getAddress(token.address),
+      let hash: string;
+      if (meta && isHardwareAccount(meta)) {
+        if (native) {
+          hash = await sendTransactionRequest(chainId, {
             to,
-            amount,
+            value: `0x${amount.toString(16)}`,
+            data: '0x',
           });
+        } else {
+          const data = encodeFunctionData({
+            abi: ERC20_ABI,
+            functionName: 'transfer',
+            args: [to, amount],
+          });
+          hash = await sendTransactionRequest(chainId, {
+            to: getAddress(token.address),
+            value: '0x0',
+            data,
+          });
+        }
+      } else {
+        hash = native
+          ? await sendNativeTransfer({ pk: pk!, chainId, to, amount })
+          : await sendErc20Transfer({
+              pk: pk!,
+              chainId,
+              token: getAddress(token.address),
+              to,
+              amount,
+            });
+      }
       await waitForChainReceipt(hash, chainId);
       setTxHash(hash);
       onSent();

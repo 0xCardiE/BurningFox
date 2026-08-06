@@ -1,9 +1,13 @@
+import { Buffer } from 'buffer';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import '@fontsource-variable/inter/wght.css';
 import { App } from './App';
 import { bootstrapLiFi } from './lib/lifiBootstrap';
 import './index.css';
+
+const globalScope = globalThis as typeof globalThis & { Buffer?: typeof Buffer };
+if (!globalScope.Buffer) globalScope.Buffer = Buffer;
 
 bootstrapLiFi();
 
