@@ -343,32 +343,60 @@ export function QuickSendInline({
   if (txHash) {
     return (
       <div className="l33t-quick-send-inline l33t-quick-send-inline--done">
-        <div className="l33t-quick-send-inline__done-main">
-          <span className="l33t-quick-send-inline__ok">Sent</span>
-          {explorerUrl ? (
-            <a
-              className="l33t-quick-send-inline__tx-link"
-              href={explorerUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {shortHash(txHash)}
-            </a>
-          ) : (
-            <span className="mono muted">{shortHash(txHash)}</span>
-          )}
-        </div>
-        <div className="l33t-quick-send-inline__done-meta">
-          <span className="l33t-quick-send-inline__hint">
-            {formatTokenAmount(sentAmount, token.decimals)} {token.symbol}
+        <div className="l33t-quick-send-inline__done-head">
+          <span className="l33t-quick-send-inline__ok-badge">
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+              <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Sent
           </span>
+          <span className="l33t-quick-send-inline__timer muted">{secondsLeft}s</span>
+        </div>
+        <div className="l33t-quick-send-inline__done-body">
+          <div className="l33t-quick-send-inline__done-line">
+            <span className="l33t-quick-send-inline__done-label">Amount</span>
+            <span className="l33t-quick-send-inline__done-value">
+              {formatTokenAmount(sentAmount, token.decimals)} {token.symbol}
+            </span>
+          </div>
           {sentTo ? (
-            <span className="l33t-quick-send-inline__to muted">to {shortAddress(sentTo)}</span>
+            <div className="l33t-quick-send-inline__done-line">
+              <span className="l33t-quick-send-inline__done-label">To</span>
+              <span className="l33t-quick-send-inline__done-value mono" title={sentTo}>
+                {shortAddress(sentTo)}
+              </span>
+            </div>
           ) : null}
           {confirmBlock != null ? (
-            <span className="l33t-quick-send-inline__block mono muted">blk #{confirmBlock.toLocaleString()}</span>
+            <div className="l33t-quick-send-inline__done-line">
+              <span className="l33t-quick-send-inline__done-label">Block</span>
+              <span className="l33t-quick-send-inline__done-value mono">
+                #{confirmBlock.toLocaleString()}
+              </span>
+            </div>
           ) : null}
-          <span className="l33t-quick-send-inline__timer muted">{secondsLeft}s</span>
+          {explorerUrl ? (
+            <div className="l33t-quick-send-inline__done-line">
+              <span className="l33t-quick-send-inline__done-label">Tx</span>
+              <a
+                className="l33t-quick-send-inline__done-value l33t-quick-send-inline__done-link mono"
+                href={explorerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={txHash}
+              >
+                {shortHash(txHash)}
+                <span className="l33t-quick-send-inline__done-link-icon" aria-hidden>
+                  ↗
+                </span>
+              </a>
+            </div>
+          ) : (
+            <div className="l33t-quick-send-inline__done-line">
+              <span className="l33t-quick-send-inline__done-label">Tx</span>
+              <span className="l33t-quick-send-inline__done-value mono">{shortHash(txHash)}</span>
+            </div>
+          )}
         </div>
       </div>
     );
