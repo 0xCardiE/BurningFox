@@ -1,0 +1,83 @@
+{
+  "$schema": "./product.manifest.schema.json",
+  "name": "1337 Wallet",
+  "shortName": "1337",
+  "version": "2.1.1",
+  "tagline": "Professional Ethereum wallet for developers, hackers, and advanced users.",
+  "elevatorPitch": "Self-custody EVM wallet built for people who want RPC control, hardware signing, LiFi swaps, and a fast terminal UI — with no 1337 accounts, no analytics, and no central server.",
+  "audience": [
+    "Software developers",
+    "Security researchers and hackers",
+    "Power users who manage their own RPCs and chains",
+    "Anyone who wants advanced tooling without wallet bloat"
+  ],
+  "positioning": {
+    "category": "Advanced self-custody Ethereum wallet (Chrome extension)",
+    "differentiators": [
+      "Side panel + popup, multi-RPC per chain, network doctor",
+      "Seed, private key, Ledger, and Trezor in one shell",
+      "LiFi swaps, multi-send, MetaMask-compatible dapp provider",
+      "Turbo vs Normal signing modes for speed or review",
+      "Dark terminal aesthetic inspired by 1337 Skulls"
+    ],
+    "notA": [
+      "Not a hosted wallet — keys never leave your browser except to chains you broadcast to",
+      "Not an analytics product — we do not track how you use the extension",
+      "Not a burner-only toy — suitable as a serious daily driver when hardened (Normal mode, auto-lock, hardware)"
+    ]
+  },
+  "privacy": {
+    "no1337Backend": true,
+    "noAnalytics": true,
+    "noTracking": true,
+    "noUserAccounts": true,
+    "noTelemetrySdk": true,
+    "summary": "1337 Wallet does not run analytics, does not phone home to a 1337 server, and does not create user profiles. Your vault, settings, and session live in Chrome extension storage on your machine.",
+    "storedLocally": [
+      "Encrypted vault (seed / private keys) in chrome.storage.local",
+      "Wallet settings, custom RPCs, and chain preferences in chrome.storage.local",
+      "Unlocked session (active key metadata) in chrome.storage.session until lock or browser restart"
+    ],
+    "networkWhenYouUseFeatures": [
+      "Public RPC endpoints you choose (balances, sends, dapp reads)",
+      "LI.FI API when you open Swap or fetch routes (integrator id only; no 1337 server)",
+      "Optional Etherscan-compatible API key you paste in Settings (sent to the explorer provider for tx history)",
+      "Ledger / Trezor device SDKs and Trezor Connect when you use hardware accounts",
+      "Token logos and chain metadata from public HTTPS URLs (e.g. LI.FI catalog)"
+    ],
+    "neverCollected": [
+      "Browsing history beyond what Chrome grants for dapp connection",
+      "Wallet addresses or balances sent to a 1337 database",
+      "Crash or usage telemetry to 1337",
+      "Email, phone, or social login"
+    ]
+  },
+  "messaging": {
+    "chromeExtensionDescription": "1337 — advanced Ethereum wallet for developers and power users. Seed/private-key accounts, Ledger/Trezor, LiFi swaps, multi-RPC, multi-send, MetaMask-compatible dapps. No analytics. No 1337 server.",
+    "onboardingLead": "Advanced Ethereum wallet for developers and power users. Create or import a seed phrase or private key — encrypted locally with your password. Add Ledger or Trezor later in Settings.",
+    "settingsPrivacyHeading": "Privacy & data",
+    "settingsPrivacyLead": "No analytics. No 1337 server. Everything below stays on your machine unless you initiate a swap, RPC call, or explorer lookup.",
+    "promoBullets": [
+      "Professional wallet UI — not a disposable burner toy",
+      "Full EVM tooling: swaps, multi-send, custom RPCs, 20+ chains",
+      "Hardware wallet support (Ledger WebHID, Trezor Connect)",
+      "Zero 1337 analytics or central account system",
+      "Open build — inspect the extension; verify before you trust"
+    ]
+  },
+  "features": [
+    "Multi-account HD seed and private-key import",
+    "Ledger (WebHID) and Trezor Connect",
+    "LI.FI cross-chain swaps",
+    "Multi-send (native + ERC-20)",
+    "Per-chain RPC picker and network doctor",
+    "MetaMask drop-in dapp provider (optional)",
+    "Side panel and popup layouts",
+    "Turbo / Normal transaction confirmation modes",
+    "Transaction history via your own explorer API key"
+  ],
+  "links": {
+    "aestheticReference": "https://chromewebstore.google.com/detail/1337-skulls-wallet/maggcienpliglmghmmfbnnmjclmopglk",
+    "liFi": "https://li.fi"
+  }
+}

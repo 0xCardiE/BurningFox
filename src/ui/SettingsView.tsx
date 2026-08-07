@@ -15,6 +15,11 @@ import {
   type ToolbarOpenMode,
 } from '../lib/storageState';
 import { describeError } from '../lib/utils';
+import {
+  PRODUCT_SETTINGS_PRIVACY_HEADING,
+  PRODUCT_SETTINGS_PRIVACY_LEAD,
+  PRODUCT_MANIFEST,
+} from '../lib/productManifest';
 import { ScreenHeader } from './ScreenHeader';
 
 export function SettingsView({
@@ -249,20 +254,21 @@ export function SettingsView({
               lineHeight: 1.45,
             }}
           >
-            <strong style={{ color: 'var(--text)' }}>Stored locally</strong>
+            <strong style={{ color: 'var(--text)' }}>{PRODUCT_SETTINGS_PRIVACY_HEADING}</strong>
+            <p className="muted" style={{ margin: '8px 0 0', fontSize: 11, lineHeight: 1.45 }}>
+              {PRODUCT_SETTINGS_PRIVACY_LEAD}
+            </p>
             <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
-              <li>
-                <code className="mono">chrome.storage.local</code>: encrypted vault and settings.
-              </li>
-              <li>
-                <code className="mono">chrome.storage.session</code>: unlocked session until lock or
-                browser restart.
-              </li>
-              <li>
-                Swaps and balances use LI.FI and public RPCs — nothing is sent to a 1337
-                server.
-              </li>
+              {PRODUCT_MANIFEST.privacy.storedLocally.map(line => (
+                <li key={line}>{line}</li>
+              ))}
+              <li>{PRODUCT_MANIFEST.privacy.networkWhenYouUseFeatures[0]}</li>
             </ul>
+            <p className="muted" style={{ margin: '8px 0 0', fontSize: 10, lineHeight: 1.4 }}>
+              No analytics SDK. No 1337 user accounts. See{' '}
+              <code className="mono">brand/product.manifest.json</code> for full positioning and
+              privacy claims.
+            </p>
           </div>
 
           {err && <p className="error">{err}</p>}

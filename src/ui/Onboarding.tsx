@@ -4,6 +4,7 @@ import {
   createInitialWallet,
   importInitialWallet,
 } from '../lib/walletManager';
+import { PRODUCT_ONBOARDING_LEAD } from '../lib/productManifest';
 import { ScreenHeader } from './ScreenHeader';
 
 type Mode = 'create' | 'import';
@@ -130,8 +131,7 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
       <ScreenHeader title="1337" />
       <div className="screen-body">
         <p className="muted" style={{ marginBottom: 14 }}>
-          Developer burner wallet. Create a seed phrase or private key, or import either — encrypted
-          locally with your password. Ledger / Trezor can be added later in Settings.
+          {PRODUCT_ONBOARDING_LEAD}
         </p>
 
         <div className="row" style={{ marginBottom: 14 }}>

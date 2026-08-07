@@ -2,6 +2,8 @@
 
 This note describes how signing works in 1337 and how to keep risk lower in practice. For a full comparison of **all account types vs MetaMask equivalents**, see **[wallet-comparison-metamask.md](./wallet-comparison-metamask.md)**.
 
+**Privacy:** 1337 does not run analytics or store wallet data on a central server. See **[brand/product.manifest.json](../brand/product.manifest.json)** for positioning and privacy claims used in the UI and future promo material.
+
 ## What the extension does today
 
 - **Local accounts** — BIP-39 seed (create/import) and/or hex private keys, encrypted in the vault (`src/lib/vault.ts`). Seed wallets can derive more HD accounts (`m/44'/60'/0'/0/n`).
@@ -36,7 +38,7 @@ See the [full multi-type table](./wallet-comparison-metamask.md).
 
 1. **Use Lock** when you step away; enable **auto-lock** (off by default).
 2. Switch dApp mode to **Normal** for MetaMask-style per-request confirmation.
-3. Prefer **Ledger/Trezor** for anything beyond burner balances.
+3. Prefer **Ledger/Trezor** for high-value funds or when you want device-backed signing.
 4. Back up **seed phrases** offline; never paste them into websites.
 5. **Install from a trustworthy build** (`npm run build` from this repo).
 

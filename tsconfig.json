@@ -17,6 +17,6 @@
     "resolveJsonModule": true,
     "useDefineForClassFields": true
   },
-  "include": ["src"],
+  "include": ["src", "brand/product.manifest.json"],
   "files": ["src/chrome-env.d.ts"]
 }

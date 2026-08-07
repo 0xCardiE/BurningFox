@@ -11,8 +11,8 @@ export function initTrezorConnect(): Promise<void> {
         await TrezorConnect.init({
           lazyLoad: true,
           manifest: {
-            email: 'burnbox@proton.me',
-            appName: 'BurnBox',
+            email: '1337-wallet@proton.me',
+            appName: '1337 Wallet',
             appUrl: 'https://github.com/0xCardiE/BurningFox',
           },
           connectSrc: TREZOR_CONNECT_SRC,

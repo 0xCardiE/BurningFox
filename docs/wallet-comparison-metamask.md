@@ -1,6 +1,6 @@
 # Security comparison: 1337 wallet types vs MetaMask
 
-Side-by-side view of **every 1337 account type** against the closest **MetaMask** equivalent. 1337 is a Chrome MV3 developer / burner wallet; MetaMask is a general-purpose browser hot wallet. Hardware rows describe keys that never leave the device.
+Side-by-side view of **every 1337 account type** against the closest **MetaMask** equivalent. 1337 is an advanced Chrome MV3 Ethereum wallet for developers and power users; MetaMask is a general-purpose browser hot wallet. Hardware rows describe keys that never leave the device.
 
 Sources for 1337: `src/lib/vault.ts`, `src/lib/walletCore.ts`, `src/lib/walletManager.ts`, `src/lib/ledger.ts`, `src/lib/trezor.ts`, `src/background.ts`, `src/lib/providerRpc.ts`, `public/manifest.json`.
 

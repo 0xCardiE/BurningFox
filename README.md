@@ -1,12 +1,14 @@
 # 1337 Wallet (Chrome extension)
 
-**1337** — developer EVM burner wallet. Create/import keys, swap via [LI.FI](https://li.fi), multi-send, RPC switcher, and MetaMask-compatible dapp connection. Styled after [1337 Skulls Wallet](https://chromewebstore.google.com/detail/1337-skulls-wallet/maggcienpliglmghmmfbnnmjclmopglk).
+**1337** — advanced Ethereum wallet for developers, hackers, and power users. Multi-RPC, LiFi swaps, hardware signing, and MetaMask-compatible dapps. **No analytics. No 1337 server.** Styled after [1337 Skulls Wallet](https://chromewebstore.google.com/detail/1337-skulls-wallet/maggcienpliglmghmmfbnnmjclmopglk).
+
+Product positioning, privacy claims, and promo copy live in **[brand/product.manifest.json](brand/product.manifest.json)** (imported in the app via `src/lib/productManifest.ts`).
 
 ## Features
 
 - **Multi-account** — seed-derived HD accounts and/or imported keys; pick the active account in the header
 - **Seed phrase** — create or import BIP-39 (12–24 words), same path style as MetaMask (`m/44'/60'/0'/0/n`)
-- **Private key** — generate or import a single hex key (burner-style)
+- **Private key** — generate or import a single hex key for focused accounts
 - **Hardware wallets** — connect Ledger (WebHID) or Trezor Connect; sign txs on-device
 - **Security docs** — [MetaMask comparison by wallet type](docs/wallet-comparison-metamask.md)
 - **Swaps** — cross-chain token swaps powered by LI.FI
@@ -14,6 +16,14 @@
 - **Networks** — 20 popular chains with pre-filled public RPCs; switch endpoint from a dropdown
 - **Dapp connect** — optional MetaMask drop-in (`window.ethereum`) for connecting to websites
 - **UI** — opens in the **side panel** by default; switch to popup in Settings
+
+## Privacy
+
+- No analytics or usage telemetry in the extension
+- No 1337 backend — vault and settings stay in Chrome extension storage on your machine
+- Network calls only when **you** use RPCs, swaps (LI.FI), explorer history (your API key), or hardware SDKs
+
+See [brand/product.manifest.json](brand/product.manifest.json) for the full manifest (website / store / promo ready).
 
 ## Development
 
@@ -27,7 +37,7 @@ Load the unpacked extension from `dist/` in Chrome (Developer mode → Load unpa
 
 ## Security
 
-Local keys are for **developer/testing** use (password-encrypted vault in extension storage). Ledger/Trezor accounts keep private keys on the device. See [docs/wallet-security.md](docs/wallet-security.md) and [MetaMask comparison](docs/wallet-comparison-metamask.md).
+Local keys are password-encrypted in extension storage. Ledger/Trezor accounts keep private keys on the device. See [docs/wallet-security.md](docs/wallet-security.md) and [MetaMask comparison](docs/wallet-comparison-metamask.md).
 
 ## Wallet pain research tool
 

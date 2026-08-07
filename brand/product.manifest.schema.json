@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "1337 Wallet product manifest",
+  "description": "Source of truth for positioning, privacy claims, and promo copy. Safe to import in a future website or store listing generator.",
+  "type": "object",
+  "required": ["name", "shortName", "tagline", "privacy", "messaging"],
+  "properties": {
+    "name": { "type": "string" },
+    "shortName": { "type": "string" },
+    "tagline": { "type": "string" },
+    "privacy": {
+      "type": "object",
+      "properties": {
+        "noAnalytics": { "type": "boolean" },
+        "noTracking": { "type": "boolean" },
+        "no1337Backend": { "type": "boolean" },
+        "summary": { "type": "string" }
+      }
+    },
+    "messaging": { "type": "object" }
+  }
+}
