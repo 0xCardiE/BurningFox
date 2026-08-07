@@ -11,6 +11,7 @@ import {
 } from '../lib/walletBalances';
 import { LeetLiFiIcon } from './LeetLiFiIcon';
 import { QuickSendInline } from './QuickSendInline';
+import { RefreshIconButton } from './RefreshIconButton';
 
 function tokenRowKey(t: WalletBalEntry): string {
   return `${t.chainId}:${t.address.toLowerCase()}`;
@@ -60,18 +61,11 @@ export function WalletHomeView({
   return (
     <div className="l33t-home">
       <div className="l33t-home-refresh-row">
-        <button
-          type="button"
-          className={`l33t-icon-head l33t-refresh-icon${busy ? ' l33t-refresh-icon--busy' : ''}`}
-          aria-label="Refresh balances"
-          disabled={busy}
+        <RefreshIconButton
+          busy={busy}
+          ariaLabel="Refresh balances"
           onClick={() => void refresh()}
-        >
-          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-            <path d="M21 3v6h-6" />
-          </svg>
-        </button>
+        />
       </div>
 
       {err ? <p className="error l33t-home-error">{err}</p> : null}

@@ -25,6 +25,7 @@ import {
 } from '../lib/txFailureDetail';
 import { describeError } from '../lib/utils';
 import { LeetLiFiIcon } from './LeetLiFiIcon';
+import { RefreshIconButton } from './RefreshIconButton';
 
 type TxKind = 'sent' | 'received' | 'self' | 'contract';
 
@@ -647,14 +648,11 @@ export function HistoryPanel({ settings }: { settings: AppSettings }) {
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          className="l33t-tx-history__refresh"
-          disabled={busy}
+        <RefreshIconButton
+          busy={busy}
+          ariaLabel="Refresh transaction history"
           onClick={() => void refreshLatest()}
-        >
-          {busy ? '…' : 'Refresh'}
-        </button>
+        />
       </div>
 
       {err ? <p className="error">{err}</p> : null}

@@ -66,6 +66,7 @@ export function L33tSelect({
   onPick,
   disabled,
   panelMaxHeight = 280,
+  showLogos = true,
 }: {
   id: string;
   label: string;
@@ -79,6 +80,7 @@ export function L33tSelect({
   onPick: (value: string) => void;
   disabled?: boolean;
   panelMaxHeight?: number;
+  showLogos?: boolean;
 }) {
   const open = openMenu === id;
   const rootRef = useRef<HTMLDivElement>(null);
@@ -124,7 +126,7 @@ export function L33tSelect({
   return (
     <div
       ref={rootRef}
-      className={`l33t-dd${open ? ' l33t-dd--open' : ''}`}
+      className={`l33t-dd${showLogos ? '' : ' l33t-dd--plain'}${open ? ' l33t-dd--open' : ''}`}
     >
       <span className="l33t-dd__label">{label}</span>
       <button
@@ -137,7 +139,7 @@ export function L33tSelect({
         onClick={() => setOpenMenu(open ? null : id)}
       >
         <span className="l33t-dd__trigger-main">
-          {triggerLogoURI ? (
+          {showLogos && triggerLogoURI ? (
             <OptionLogo logoURI={triggerLogoURI} label={triggerLabel} />
           ) : null}
           <span className="l33t-dd__trigger-text">
@@ -180,7 +182,9 @@ export function L33tSelect({
                     }}
                   >
                     <span className="l33t-dd__option-main">
-                      <OptionLogo logoURI={opt.logoURI} label={opt.label} />
+                      {showLogos ? (
+                        <OptionLogo logoURI={opt.logoURI} label={opt.label} />
+                      ) : null}
                       <span className="l33t-dd__option-text">
                         <span className="l33t-dd__option-label">{opt.label}</span>
                         {opt.sublabel ? (
@@ -201,6 +205,47 @@ export function L33tSelect({
         </div>
       ) : null}
     </div>
+  );
+}
+
+export function L33tSimpleSelect({
+  id,
+  label,
+  openMenu,
+  setOpenMenu,
+  value,
+  options,
+  onChange,
+  disabled,
+  panelMaxHeight = 240,
+}: {
+  id: string;
+  label: string;
+  openMenu: string | null;
+  setOpenMenu: (v: string | null) => void;
+  value: string;
+  options: L33tSelectOption[];
+  onChange: (value: string) => void;
+  disabled?: boolean;
+  panelMaxHeight?: number;
+}) {
+  const selected = options.find(opt => opt.value === value);
+
+  return (
+    <L33tSelect
+      id={id}
+      label={label}
+      openMenu={openMenu}
+      setOpenMenu={setOpenMenu}
+      value={value}
+      triggerLabel={selected?.label ?? value}
+      triggerSublabel={selected?.sublabel}
+      groups={[{ label: '', options }]}
+      onPick={onChange}
+      disabled={disabled}
+      panelMaxHeight={panelMaxHeight}
+      showLogos={false}
+    />
   );
 }
 

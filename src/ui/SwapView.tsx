@@ -26,6 +26,7 @@ import { ScreenHeader } from './ScreenHeader';
 import { LeetLiFiIcon } from './LeetLiFiIcon';
 import { LeetTokenWithBadge } from './LeetTokenWithBadge';
 import { DefiYieldPanel } from './DefiYieldPanel';
+import { RefreshIconButton } from './RefreshIconButton';
 
 type WalletTab = 'swap' | 'defi' | 'history';
 
@@ -1519,18 +1520,15 @@ export function SwapView({
               )}
             </div>
 
-            <div className="leet-footer leet-footer--tight">
-              <button
-                type="button"
-                className="ghost"
-                disabled={balancesBusy}
+            <div className="leet-footer leet-footer--tight leet-footer--icon">
+              <RefreshIconButton
+                busy={balancesBusy}
+                ariaLabel="Refresh balances"
                 onClick={() => {
                   snapshotActiveFromChain();
                   void reloadBalances();
                 }}
-              >
-                Refresh
-              </button>
+              />
             </div>
           </>
         ) : walletTab === 'defi' ? (

@@ -234,6 +234,20 @@ h2 {
   margin-top: 0;
 }
 
+.settings-callout {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.settings-callout--warn {
+  border: 1px solid rgba(251, 146, 60, 0.35);
+  background: rgba(251, 146, 60, 0.08);
+  color: #fdba74;
+}
+
 .row {
   display: flex;
   flex-wrap: wrap;
@@ -1990,6 +2004,10 @@ button.leet-pct--max {
 
 .leet-footer--tight .ghost {
   flex: 1 1 100%;
+}
+
+.leet-footer--icon {
+  justify-content: flex-end;
 }
 
 /* ── Full-height picker sheets ─────────────────────────────────── */
@@ -3952,6 +3970,10 @@ button.l33t-dd__option--on:hover:not(:disabled) {
   color: var(--acc);
 }
 
+.l33t-dd--plain .l33t-dd__option-main {
+  gap: 0;
+}
+
 .l33t-home-refresh-row {
   display: flex;
   justify-content: flex-end;
@@ -4268,23 +4290,6 @@ button.l33t-token-row--action:hover:not(:disabled) {
 .l33t-tx-history__head-sub {
   margin: 2px 0 0;
   font-size: 12px;
-}
-
-.l33t-tx-history__refresh {
-  flex-shrink: 0;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 650;
-  border-radius: var(--radius-pill);
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  color: var(--acc);
-  box-shadow: none;
-}
-
-.l33t-tx-history__refresh:hover:not(:disabled) {
-  background: var(--accent-soft-2);
-  border-color: rgba(34, 197, 94, 0.3);
 }
 
 .l33t-tx-history__groups {

@@ -28,6 +28,7 @@ import {
 import { loadWalletBalancesForChain, type WalletBalEntry } from '../lib/walletBalances';
 import { describeError } from '../lib/utils';
 import { LeetLiFiIcon } from './LeetLiFiIcon';
+import { RefreshIconButton } from './RefreshIconButton';
 
 function shortAddress(addr: string): string {
   if (addr.length < 12) return addr;
@@ -387,14 +388,11 @@ export function ApprovalsPanel({ settings }: { settings: AppSettings }) {
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          className="l33t-tx-history__refresh"
-          disabled={busy || scanningTokens.length > 0}
+        <RefreshIconButton
+          busy={busy || scanningTokens.length > 0}
+          ariaLabel="Refresh token approvals"
           onClick={() => void refreshAll()}
-        >
-          {busy || scanningTokens.length > 0 ? '…' : 'Refresh'}
-        </button>
+        />
       </div>
 
       <div className="l33t-approvals__notice" role="note">

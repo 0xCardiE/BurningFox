@@ -11,6 +11,8 @@ import { allRpcOptionsFor } from '../lib/chainRpcRegistry';
 import { getNativeBalance, erc20BalanceOf } from '../lib/ethereum';
 import { describeError } from '../lib/utils';
 import { ScreenHeader } from './ScreenHeader';
+import { L33tSimpleSelect } from './L33tSelect';
+import { RefreshIconButton } from './RefreshIconButton';
 
 export function NetworksView({
   settings,
@@ -35,6 +37,7 @@ export function NetworksView({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
 
   const rpcOptions = allRpcOptionsFor(chainId);
 
@@ -143,33 +146,35 @@ export function NetworksView({
           choose an endpoint, refresh balances.
         </p>
 
-        <label htmlFor="net-chain">Chain</label>
-        <select
+        <L33tSimpleSelect
           id="net-chain"
-          value={chainId}
-          onChange={e => setChainId(Number(e.target.value))}
-        >
-          {CHAIN_CATALOG.map(c => (
-            <option key={c.chainId} value={c.chainId}>
-              {c.name} ({c.chainId})
-            </option>
-          ))}
-        </select>
+          label="Chain"
+          openMenu={openMenu}
+          setOpenMenu={setOpenMenu}
+          value={String(chainId)}
+          options={CHAIN_CATALOG.map(c => ({
+            value: String(c.chainId),
+            label: `${c.name} (${c.chainId})`,
+          }))}
+          onChange={v => setChainId(Number(v))}
+          panelMaxHeight={320}
+        />
 
-        <label htmlFor="net-rpc" style={{ marginTop: 12 }}>
-          RPC endpoint
-        </label>
-        <select
-          id="net-rpc"
-          value={rpcUrl}
-          onChange={e => setRpcUrl(e.target.value)}
-        >
-          {rpcOptions.map(u => (
-            <option key={u} value={u}>
-              {u.length > 52 ? `${u.slice(0, 49)}…` : u}
-            </option>
-          ))}
-        </select>
+        <div style={{ marginTop: 12 }}>
+          <L33tSimpleSelect
+            id="net-rpc"
+            label="RPC endpoint"
+            openMenu={openMenu}
+            setOpenMenu={setOpenMenu}
+            value={rpcUrl}
+            options={rpcOptions.map(u => ({
+              value: u,
+              label: u.length > 52 ? `${u.slice(0, 49)}…` : u,
+            }))}
+            onChange={setRpcUrl}
+            panelMaxHeight={300}
+          />
+        </div>
 
         <label htmlFor="net-custom" style={{ marginTop: 12 }}>
           Add custom RPC
@@ -201,7 +206,16 @@ export function NetworksView({
 
         <hr className="sep" style={{ margin: '18px 0' }} />
 
-        <h3 style={{ fontSize: '0.95rem' }}>Balances on {activeChain?.name ?? activeChainId}</h3>
+        <div className="row" style={{ marginBottom: 8 }}>
+          <h3 style={{ fontSize: '0.95rem', margin: 0 }}>
+            Balances on {activeChain?.name ?? activeChainId}
+          </h3>
+          <RefreshIconButton
+            busy={busy}
+            ariaLabel="Refresh balances"
+            onClick={() => void refreshBalances()}
+          />
+        </div>
         {addr ? (
           <>
             <p className="mono" style={{ fontSize: 12, wordBreak: 'break-all' }}>
@@ -222,9 +236,6 @@ export function NetworksView({
                 Token balance (raw): <strong>{tokenBal}</strong>
               </p>
             ) : null}
-            <button type="button" className="ghost" onClick={() => void refreshBalances()}>
-              Refresh balances
-            </button>
           </>
         ) : (
           <p className="error">Unlock wallet to view balances.</p>
