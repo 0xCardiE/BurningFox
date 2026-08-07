@@ -186,6 +186,10 @@ class L33tProvider {
       } else {
         void this.syncState();
       }
+    } else if (args.method === 'wallet_revokePermissions') {
+      this.selectedAddress = null;
+      this.emit('disconnect', new ProviderRpcError(4900, 'Disconnected'));
+      this.emit('accountsChanged', []);
     }
 
     return result;

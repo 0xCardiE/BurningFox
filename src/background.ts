@@ -499,7 +499,11 @@ chrome.runtime.onMessage.addListener(
           if (res.ok && res.switchedChainId != null) {
             void broadcastChainChanged(res.switchedChainId, sender.tab?.id);
           }
-          const { switchedChainId: _switched, ...response } = res;
+          if (res.ok && res.disconnected && sender.tab?.id != null) {
+            await emitToTab(sender.tab.id, { type: 'disconnect' });
+            await emitToTab(sender.tab.id, { type: 'accountsChanged', accounts: [] });
+          }
+          const { switchedChainId: _switched, disconnected: _disconnected, ...response } = res;
           sendResponse(response);
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);

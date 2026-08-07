@@ -21,6 +21,7 @@ import {
   PRODUCT_MANIFEST,
 } from '../lib/productManifest';
 import { ScreenHeader } from './ScreenHeader';
+import { L33tSimpleSelect } from './L33tSelect';
 
 export function SettingsView({
   settings,
@@ -53,6 +54,7 @@ export function SettingsView({
     () => settings.replaceMetaMask !== false,
   );
   const [explorerApiKey, setExplorerApiKey] = useState(() => settings.explorerApiKey ?? '');
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -174,42 +176,56 @@ export function SettingsView({
             Sent to Li.FI as a ratio (example: 5% → 0.05). Used when requesting quotes.
           </p>
 
-          <label htmlFor="autolock" style={{ marginTop: 16 }}>
-            Auto-lock after idle
-          </label>
-          <select
-            id="autolock"
+          <div style={{ marginTop: 16 }}>
+            <L33tSimpleSelect
+              id="autolock"
+              label="Auto-lock after idle"
+            openMenu={openMenu}
+            setOpenMenu={setOpenMenu}
             value={autoLockM}
-            onChange={(e) => setAutoLockM(e.target.value)}
-          >
-            <option value="0">Off</option>
-            <option value="5">5 minutes</option>
-            <option value="15">15 minutes</option>
-            <option value="30">30 minutes</option>
-            <option value="60">60 minutes</option>
-          </select>
-          <p className="muted" style={{ fontSize: 12 }}>
+            options={[
+              { value: '0', label: 'Off' },
+              { value: '5', label: '5 minutes' },
+              { value: '15', label: '15 minutes' },
+              { value: '30', label: '30 minutes' },
+              { value: '60', label: '60 minutes' },
+            ]}
+            onChange={setAutoLockM}
+            />
+          </div>
+          <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
             Locks while the wallet UI is open but inactive. Uses the extension service worker clock.
           </p>
 
-          <label htmlFor="openmode" style={{ marginTop: 16 }}>
-            Open from toolbar
-          </label>
-          <select
-            id="openmode"
-            value={openMode}
-            onChange={e => setOpenMode(e.target.value as ToolbarOpenMode)}
-          >
-            <option value="popup">Popup</option>
-            {sidePanelSupported ? (
-              <option value="side_panel">Side panel</option>
-            ) : null}
-          </select>
-          <p className="muted" style={{ fontSize: 12 }}>
+          <div style={{ marginTop: 16 }}>
+            <L33tSimpleSelect
+              id="openmode"
+              label="Open from toolbar"
+              openMenu={openMenu}
+              setOpenMenu={setOpenMenu}
+              value={openMode}
+              options={
+                sidePanelSupported
+                  ? [
+                      { value: 'side_panel', label: 'Side panel', sublabel: 'Recommended' },
+                      { value: 'popup', label: 'Popup' },
+                    ]
+                  : [{ value: 'popup', label: 'Popup' }]
+              }
+              onChange={v => setOpenMode(v as ToolbarOpenMode)}
+            />
+          </div>
+          <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
             {sidePanelSupported
-              ? 'Side panel opens 1337 in the browser sidebar when you click the extension icon (default).'
+              ? 'Side panel keeps 1337 docked in the browser sidebar — strongly recommended for swaps, history, and dapp connections while you browse.'
               : 'Side panel requires a Chromium browser with side panel support (e.g. Chrome 114+).'}
           </p>
+          {sidePanelSupported && openMode === 'popup' ? (
+            <p className="settings-callout settings-callout--warn">
+              The wallet works best in the side panel. Popup closes when you click away and makes
+              it easy to lose transaction context.
+            </p>
+          ) : null}
 
           <label htmlFor="explorer-key" style={{ marginTop: 16 }}>
             Etherscan API key (transaction history)
@@ -227,17 +243,20 @@ export function SettingsView({
             BSC, and other *scan chains. Blockscout chains work without a key.
           </p>
 
-          <label htmlFor="metamask" style={{ marginTop: 16 }}>
-            Dapp connection
-          </label>
-          <select
-            id="metamask"
-            value={replaceMetaMask ? 'replace' : 'separate'}
-            onChange={e => setReplaceMetaMask(e.target.value === 'replace')}
-          >
-            <option value="replace">Replace MetaMask (window.ethereum)</option>
-            <option value="separate">Separate provider (window.l33t only)</option>
-          </select>
+          <div style={{ marginTop: 16 }}>
+            <L33tSimpleSelect
+              id="metamask"
+              label="Dapp connection"
+              openMenu={openMenu}
+              setOpenMenu={setOpenMenu}
+              value={replaceMetaMask ? 'replace' : 'separate'}
+              options={[
+                { value: 'replace', label: 'Replace MetaMask (window.ethereum)' },
+                { value: 'separate', label: 'Separate provider (window.l33t only)' },
+              ]}
+              onChange={v => setReplaceMetaMask(v === 'replace')}
+            />
+          </div>
           <p className="muted" style={{ fontSize: 12 }}>
             When enabled, sites that offer MetaMask will connect to 1337 instead. Reload open
             tabs after changing this.

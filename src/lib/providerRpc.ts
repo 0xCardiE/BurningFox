@@ -22,7 +22,11 @@ import {
   type AppSettings,
 } from './storageState';
 import { shouldQueueDappApproval } from './txConfirmMode';
-import { connectOrigin, isOriginConnected } from './dappConnections';
+import {
+  connectOrigin,
+  disconnectOrigin,
+  isOriginConnected,
+} from './dappConnections';
 import { chainJsonRpcCall } from './ethereum';
 import { reportProviderRpcFailure } from './devErrorReport';
 import { isSignMethod, queueApprovalRequest } from './pendingApprovals';
@@ -71,7 +75,19 @@ export async function executeSignRequest(
 export type ProviderRpcResult = ProviderResponse & {
   /** Set when switch/add chain succeeded so background can emit chainChanged. */
   switchedChainId?: number;
+  /** Set when wallet_revokePermissions disconnected the requesting origin. */
+  disconnected?: boolean;
 };
+
+function ethAccountsPermission(sessionAddr: string): Record<string, unknown> {
+  return {
+    eth_accounts: {
+      parentCapability: 'eth_accounts',
+      date: Date.now(),
+      caveats: [{ type: 'restrictReturnedAccounts', value: [sessionAddr] }],
+    },
+  };
+}
 
 /** Read / simulation RPC forwarded to the active chain's RPC (for dapp previews). */
 const PROXY_RPC_METHODS = new Set([
@@ -120,6 +136,45 @@ export async function handleProviderRpc(
 
     if (method === 'net_version') {
       return { id, ok: true, result: String(chainId) };
+    }
+
+    if (method === 'wallet_getPermissions') {
+      if (!sessionAddr || !origin || !(await isOriginConnected(origin))) {
+        return { id, ok: true, result: [] };
+      }
+      return {
+        id,
+        ok: true,
+        result: [
+          {
+            parentCapability: 'eth_accounts',
+            caveats: [{ type: 'restrictReturnedAccounts', value: [sessionAddr] }],
+          },
+        ],
+      };
+    }
+
+    if (method === 'wallet_requestPermissions') {
+      if (!sessionAddr) {
+        throw Object.assign(new Error('1337 is locked. Unlock the extension first.'), {
+          code: 4100,
+        });
+      }
+      const requested = params[0] as Record<string, unknown> | undefined;
+      if (!requested || typeof requested !== 'object' || !('eth_accounts' in requested)) {
+        throw Object.assign(new Error('Unsupported permission requested'), { code: 4200 });
+      }
+      if (origin) await connectOrigin(origin);
+      return { id, ok: true, result: ethAccountsPermission(sessionAddr) };
+    }
+
+    if (method === 'wallet_revokePermissions') {
+      const requested = params[0] as Record<string, unknown> | undefined;
+      if (!requested || typeof requested !== 'object' || !('eth_accounts' in requested)) {
+        throw Object.assign(new Error('Unsupported permission requested'), { code: 4200 });
+      }
+      if (origin) await disconnectOrigin(origin);
+      return { id, ok: true, result: null, disconnected: true };
     }
 
     if (method === 'eth_accounts' || method === 'eth_requestAccounts') {

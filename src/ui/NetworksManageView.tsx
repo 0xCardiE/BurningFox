@@ -18,6 +18,7 @@ import { allRpcOptionsFor } from '../lib/chainRpcRegistry';
 import { describeError } from '../lib/utils';
 import { LeetLiFiIcon } from './LeetLiFiIcon';
 import { ScreenHeader } from './ScreenHeader';
+import { L33tSimpleSelect } from './L33tSelect';
 
 type Panel = 'list' | 'detail' | 'add';
 
@@ -64,6 +65,7 @@ export function NetworksManageView({
   const [addRpcUrl, setAddRpcUrl] = useState('');
   const [addExplorer, setAddExplorer] = useState('');
   const [addKind, setAddKind] = useState<ChainKind>('mainnet');
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
 
   const chains = useMemo(() => {
     const filtered = allChains().filter(c => c.kind === filter);
@@ -540,17 +542,18 @@ export function NetworksManageView({
               placeholder="ETH"
             />
 
-            <label htmlFor="add-kind" style={{ marginTop: 12 }}>
-              Network type
-            </label>
-            <select
+            <L33tSimpleSelect
               id="add-kind"
+              label="Network type"
+              openMenu={openMenu}
+              setOpenMenu={setOpenMenu}
               value={addKind}
-              onChange={e => setAddKind(e.target.value as ChainKind)}
-            >
-              <option value="mainnet">Mainnet</option>
-              <option value="testnet">Testnet</option>
-            </select>
+              options={[
+                { value: 'mainnet', label: 'Mainnet' },
+                { value: 'testnet', label: 'Testnet' },
+              ]}
+              onChange={v => setAddKind(v as ChainKind)}
+            />
 
             <label htmlFor="add-rpc" style={{ marginTop: 12 }}>
               RPC URL
